@@ -15,15 +15,6 @@ pub extern fn eh_personality() {}
 pub extern fn panic_fmt() -> ! { loop {} }
 
 #[no_mangle]
-pub extern fn robey() -> u8 {
-  const UART0_BASE: u32 = 0x3f201000;
-  let console = uart::Uart::new(UART0_BASE);
-  console.init();
-  console.putc(0x52);
-  0x50
-}
-
-#[no_mangle]
 pub extern fn kernel_main() {
   let console = uart::Uart::new(uart::RPI2_UART0);
   console.init();
@@ -36,12 +27,4 @@ pub extern fn kernel_main() {
     console.putc(console.getc());
     console.putc(10);
   }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }

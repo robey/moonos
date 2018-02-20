@@ -3,13 +3,19 @@ use mmio::{gpio, Mmio, PudMode};
 // offsets into the memory-mapped uart base:
 // (can't use enum because rust doesn't understand that it's an isize)
 const REG_DR: isize = 0x00;
+// RDRECR = 0x04
 const REG_FR: isize = 0x18;
+// ILPR = 0x20
 const REG_IBRD: isize = 0x24;
 const REG_FBRD: isize = 0x28;
 const REG_LCRH: isize = 0x2c;
 const REG_CR: isize = 0x30;
+// IFLS = 0x34
 const REG_IMSC: isize = 0x38;
+// RIS = 0x3c
+// MIS = 0x40
 const REG_ICR: isize = 0x44;
+// DMACR = 0x48
 
 // pin assignments
 const PIN_TXD0: usize = 14;
@@ -42,34 +48,6 @@ const IMSC_RX_TIMEOUT: u32 = (1 << 6);
 const IMSC_TX: u32 = (1 << 5);
 const IMSC_RX: u32 = (1 << 4);
 const IMSC_CTS: u32 = (1 << 1);
-
-/*
-enum
-{
-    // The base address for UART.
-    UART0_BASE = 0x3F201000, // for raspi2 & 3, 0x20201000 for raspi1
-
-    UART0_DR     = (UART0_BASE + 0x00),
-    UART0_RSRECR = (UART0_BASE + 0x04),
-    UART0_FR     = (UART0_BASE + 0x18),
-    UART0_ILPR   = (UART0_BASE + 0x20),
-    UART0_IBRD   = (UART0_BASE + 0x24),
-    UART0_FBRD   = (UART0_BASE + 0x28),
-    UART0_LCRH   = (UART0_BASE + 0x2C),
-    UART0_CR     = (UART0_BASE + 0x30),
-    UART0_IFLS   = (UART0_BASE + 0x34),
-    UART0_IMSC   = (UART0_BASE + 0x38),
-    UART0_RIS    = (UART0_BASE + 0x3C),
-    UART0_MIS    = (UART0_BASE + 0x40),
-    UART0_ICR    = (UART0_BASE + 0x44),
-    UART0_DMACR  = (UART0_BASE + 0x48),
-    UART0_ITCR   = (UART0_BASE + 0x80),
-    UART0_ITIP   = (UART0_BASE + 0x84),
-    UART0_ITOP   = (UART0_BASE + 0x88),
-    UART0_TDR    = (UART0_BASE + 0x8C),
-};
-*/
-
 
 
 pub struct Uart {
