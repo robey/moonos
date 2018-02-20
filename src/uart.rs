@@ -1,4 +1,4 @@
-use mmio::{gpio, Mmio, PudMode};
+use mmio::{gpio, Mmio, PudMode, wait_for_event};
 
 // offsets into the memory-mapped uart base:
 // (can't use enum because rust doesn't understand that it's an isize)
@@ -94,9 +94,17 @@ impl Uart {
     for c in s.bytes() { self.putc(c) }
   }
 
+  pub fn put_u32(&self, n: u32) {
+    self.putc(b'$');
+    for i in 0..8 {
+      let nybble = (n >> (28 - i * 4)) & 0xf;
+      self.putc(if nybble > 9 { 0x61 + nybble - 10 } else { 0x30 + nybble } as u8);
+    }
+  }
+
   pub fn getc(&self) -> u8 {
     while self.read(REG_FR) & FR_RX_EMPTY != 0 {
-      unsafe { asm!("wfe") }
+      wait_for_event();
     }
     self.putc(0x21);
     (self.read(REG_DR) & 0xff) as u8

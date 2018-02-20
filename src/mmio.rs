@@ -19,7 +19,7 @@ const REG_GPPUDCLK0: isize = 0x98;
 const REG_GPPUDCLK1: isize = 0x9c;
 
 #[inline]
-fn delay(cycles: usize) {
+pub fn delay(cycles: usize) {
   let mut _n = cycles;
   unsafe {
     asm!(
@@ -28,12 +28,23 @@ fn delay(cycles: usize) {
         subs $0, $0, #1
         bne ${:private}_delay_${:uid}
       "
-      : "=r"(_n)     // outputs
-      : "0"(_n)      // inputs
+      : "=r"(_n)    // outputs
+      : "0"(_n)     // inputs
       : "cc"        // clobbers
       : "volatile"  // options
     );
   }
+}
+
+// "data synchronization barrier"
+#[inline]
+pub fn barrier() {
+  unsafe { asm!("dsb" ::: "memory" : "volatile") }
+}
+
+#[inline]
+pub fn wait_for_event() {
+  unsafe { asm!("wfe" :::: "volatile") }
 }
 
 pub trait Mmio {
@@ -86,9 +97,6 @@ impl Mmio for Gpio {
   fn base(&self) -> *mut u8 { GPIO_BASE as *mut u8 }
 }
 
-// pub static  _gpio: Option<Gpio> = None;
-
 pub fn gpio() -> Gpio {
-  // unsafe { _gpio.get_or_insert_with(|| Gpio::new()) }
   Gpio::new()
 }
