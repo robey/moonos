@@ -53,4 +53,6 @@ rm -rf target/kernel && mkdir -p target/kernel
 arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/boot.S -o target/kernel/boot.o
 arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
 
+size -A -x target/kernel/myos.elf
+
 qemu-system-arm -m 256 -M raspi2 -serial stdio -kernel target/kernel/myos.elf
