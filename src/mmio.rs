@@ -76,7 +76,7 @@ impl Gpio {
     for i in 0..pins.len() {
       let pin = pins[i];
       if pin < 32 {
-        mask0 |= 1 << (pin as u8);
+        mask0 |= 1 << pin;
       } else {
         mask1 |= 1 << (pin - 32);
       }
