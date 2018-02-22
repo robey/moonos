@@ -8,20 +8,16 @@ const TAG_FB_SET_SIZE: u32 = 0x00048003;
 const TAG_FB_SET_VIRTUAL_SIZE: u32 = 0x00048004;
 const TAG_FB_SET_DEPTH: u32 = 0x00048005;
 
-static mut EMPTY: [u8; 0] = [0; 0];
-
 pub struct Framebuffer {
   width: u32,
   height: u32,
   depth: u32,
-  framebuffer: &'static mut [u8]
+  framebuffer: Option<&'static mut [u8]>,
 }
 
 impl Framebuffer {
   pub fn new() -> Framebuffer {
-    unsafe {
-      Framebuffer { width: 0, height: 0, depth: 0, framebuffer: &mut EMPTY }
-    }
+    Framebuffer { width: 0, height: 0, depth: 0, framebuffer: None }
   }
 
   pub fn set_size(&mut self, width: u32, height: u32, depth: u32) -> PropertyMailboxCode {
@@ -48,8 +44,7 @@ impl Framebuffer {
     if rv != PropertyMailboxCode::Ok { return rv }
 
     if let Some(&[ address, size ]) = prop.tag_result(TAG_FB_GET_FRAMEBUFFER) {
-      let framebuffer = unsafe { slice::from_raw_parts_mut(address as usize as *mut u8, size as usize) };
-      self.framebuffer = framebuffer;
+      self.framebuffer = unsafe { Some(slice::from_raw_parts_mut(address as usize as *mut u8, size as usize)) };
       PropertyMailboxCode::Ok
     } else {
       PropertyMailboxCode::BadReply
@@ -57,14 +52,36 @@ impl Framebuffer {
   }
 
   pub fn set_pixel(&mut self, x: u32, y: u32, color: u32) {
-    // if self.framebuffer.is_some() {
-      let bpp = self.depth >> 3;
-      let pitch = self.width * bpp;
-      let offset = y * pitch + x * bpp;
+    if self.framebuffer.is_none() { return }
+    let bpp = self.depth >> 3;
+    let pitch = self.width * bpp;
+    let offset = y * pitch + x * bpp;
+    self.framebuffer.as_mut().map(|fb| {
       for i in 0..bpp {
-        self.framebuffer[(offset + i) as usize] = ((color >> (i * 8)) & 0xff) as u8;
+        fb[(offset + i) as usize] = ((color >> (i * 8)) & 0xff) as u8;
       }
-    // }
+    });
+  }
+
+  pub fn blit_glyph(&mut self, x: u32, y: u32, height: usize, glyph: &[u32], fg: u32, bg: u32) {
+    if self.framebuffer.is_none() { return }
+    let bpp = self.depth >> 3;
+    let pitch = self.width * bpp;
+    let mut line = y * pitch + x * bpp;
+    let mut offset = line;
+    self.framebuffer.as_mut().map(|fb| {
+      for py in 0..height {
+        for px in 0..glyph.len() {
+          let color = if (glyph[px] >> py) & 1 != 0 { fg } else { bg };
+          for i in 0..bpp {
+            fb[(offset + i) as usize] = ((color >> (i * 8)) & 0xff) as u8;
+          }
+          offset += bpp;
+        }
+        line += pitch;
+        offset = line;
+      }
+    });
   }
 }
 
