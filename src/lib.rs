@@ -1,8 +1,10 @@
 #![feature(asm)]
-#![feature(lang_items)]
 #![feature(core_intrinsics)]
+#![feature(lang_items)]
+#![feature(slice_patterns)]
 #![no_std]
 
+mod framebuffer;
 mod mailbox;
 mod mmio;
 mod uart;
@@ -27,9 +29,15 @@ pub extern fn kernel_main() {
   console.init();
   console.puts("hello raspi kernel world!\r\n");
 
-  let n = mailbox::mailbox().robey3();
-  console.put_u32(n);
-
+  let mut fb = framebuffer::framebuffer();
+  fb.set_size(640, 480, 24);
+  console.put_u32(fb.get_framebuffer() as u32);
+  console.putc(10);
+  for x in 5..20 {
+    for y in 5..20 {
+      fb.set_pixel(x, y, 0x00ff00);
+    }
+  }
   console.putc(0x52);
   console.putc(0x50);
   console.putc(10);

@@ -13,25 +13,7 @@ const STATUS_EMPTY: u32 = (1 << 30);
 
 const CHAN_PROPERTY: u8 = 8;
 
-const MAILBOX_BUFFER_SIZE: usize = 128;
-static mut MAILBOX_BUFFER: [u32; MAILBOX_BUFFER_SIZE] = [0; MAILBOX_BUFFER_SIZE];
-
-const TAG_FB_SET_SIZE: u32 = 0x00048003;
-const TAG_FB_SET_VIRTUAL_SIZE: u32 = 0x00048004;
-const TAG_FB_SET_DEPTH: u32 = 0x00048005;
 const TAG_END: u32 = 0;
-
-// need the mailbox buffer to be aligned to 16, which rust can't currently do
-fn align_usize(n: usize) -> usize {
-  ((n + 15) >> 4) << 4
-}
-fn align_ptr<T>(p: *mut T) -> *mut T {
-  align_usize(p as usize) as *mut T
-}
-fn buffer_aligned() -> &'static mut [u32; MAILBOX_BUFFER_SIZE] {
-  // don't judge me!
-  unsafe { &mut *align_ptr(&mut MAILBOX_BUFFER as *mut [u32; MAILBOX_BUFFER_SIZE]) as &mut [u32; MAILBOX_BUFFER_SIZE] }
-}
 
 pub struct Mailbox {
 }
@@ -61,14 +43,6 @@ impl Mailbox {
     self.write(REG_WRITE, (data << 4) | (channel as u32));
     barrier();
   }
-
-  pub fn robey3(&self) -> u32 {
-    let mut prop = PropertyMailbox::new();
-    prop.add(TAG_FB_SET_SIZE, &[640, 480]);
-    prop.add(TAG_FB_SET_VIRTUAL_SIZE, &[640, 480]);
-    prop.add(TAG_FB_SET_DEPTH, &[24]);
-    prop.write(self) as u32
-  }
 }
 
 impl Mmio for Mailbox {
@@ -89,6 +63,7 @@ const CODE_REQUEST: u32 = 0;
 const CODE_RESPONSE_OK: u32 = 0x80000000;
 const CODE_RESPONSE_ERROR: u32 = 0x80000001;
 
+#[derive(Debug, PartialEq)]
 pub enum PropertyMailboxCode {
   Ok, NoReply, BadReply, Error
 }
@@ -134,12 +109,38 @@ impl PropertyMailbox {
     mailbox.write_channel(CHAN_PROPERTY, data);
     let response_data = mailbox.read_channel(CHAN_PROPERTY);
     if response_data != data { return PropertyMailboxCode::BadReply }
-    match self.buffer[1] {
-      CODE_REQUEST => PropertyMailboxCode::NoReply,
-      CODE_RESPONSE_OK => PropertyMailboxCode::Ok,
-      CODE_RESPONSE_ERROR => PropertyMailboxCode::Error,
-      _ => PropertyMailboxCode::BadReply
+    decode_error(self.buffer[1])
+  }
+
+  pub fn find_tag(&self, tag: u32) -> Option<usize> {
+    let mut index = 2;
+    if self.buffer[0] < 16 { return None }
+    loop {
+      if self.buffer[index] == TAG_END { return None }
+      if self.buffer[index] == tag { return Some(index) }
+      index += 3 + (self.buffer[index + 1] >> 2) as usize;
     }
   }
 
+  pub fn tag_result(&self, tag: u32) -> Option<&[u32]> {
+    self.find_tag(tag).and_then(|index| {
+      let response = self.buffer[index + 2];
+      if response & (1 << 31) == 0 {
+        None
+      } else {
+        let response_size = ((response & 0x7fff_ffff) >> 2) as usize;
+        Some(&self.buffer[index + 3 .. index + 3 + response_size])
+      }
+    })
+  }
+
+}
+
+fn decode_error(code: u32) -> PropertyMailboxCode {
+  match code {
+    CODE_REQUEST => PropertyMailboxCode::NoReply,
+    CODE_RESPONSE_OK => PropertyMailboxCode::Ok,
+    CODE_RESPONSE_ERROR => PropertyMailboxCode::Error,
+    _ => PropertyMailboxCode::BadReply
+  }
 }
