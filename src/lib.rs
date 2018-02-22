@@ -29,15 +29,23 @@ pub extern fn kernel_main() {
   console.init();
   console.puts("hello raspi kernel world!\r\n");
 
+  let info = mailbox::get_memory_info().unwrap();
+  console.put_u32(info.cpu_base);
+  console.putc(32);
+  console.put_u32(info.cpu_size);
+  console.putc(32);
+  console.put_u32(info.gpu_base);
+  console.putc(32);
+  console.put_u32(info.gpu_size);
+  console.putc(10);
+
   let mut fb = framebuffer::framebuffer();
   fb.set_size(640, 480, 24);
-  console.put_u32(fb.get_framebuffer() as u32);
-  console.putc(10);
-  for x in 5..20 {
-    for y in 5..20 {
-      fb.set_pixel(x, y, 0x00ff00);
-    }
-  }
+  fb.get_framebuffer();
+  fb.blit_glyph(6, 8, 8, &[ 0x7c, 0x12, 0x11, 0x12, 0x7c, 0 ], 0x00ffff, 0xff0000);
+  fb.blit_glyph(12, 8, 8, &[ 0x7c, 0x12, 0x11, 0x12, 0x7c, 0 ], 0x00ffff, 0xff0000);
+  fb.blit_glyph(18, 8, 8, &[ 0x7c, 0x12, 0x11, 0x12, 0x7c, 0 ], 0x00ffff, 0xff0000);
+  fb.blit_glyph(24, 8, 8, &[ 0x7c, 0x12, 0x11, 0x12, 0x7c, 0 ], 0x00ffff, 0xff0000);
   console.putc(0x52);
   console.putc(0x50);
   console.putc(10);
