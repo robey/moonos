@@ -13,6 +13,8 @@ const STATUS_EMPTY: u32 = (1 << 30);
 
 const CHAN_PROPERTY: u8 = 8;
 
+const TAG_HW_GET_CPU_MEMORY: u32 = 0x00010005;
+const TAG_HW_GET_GPU_MEMORY: u32 = 0x00010006;
 const TAG_END: u32 = 0;
 
 pub struct Mailbox {
@@ -143,4 +145,27 @@ fn decode_error(code: u32) -> PropertyMailboxCode {
     CODE_RESPONSE_ERROR => PropertyMailboxCode::Error,
     _ => PropertyMailboxCode::BadReply
   }
+}
+
+pub struct MemoryInfo {
+  pub cpu_base: u32,
+  pub cpu_size: u32,
+  pub gpu_base: u32,
+  pub gpu_size: u32,
+}
+
+pub fn get_memory_info() -> Option<MemoryInfo> {
+  let mut prop = PropertyMailbox::new();
+  // request align(16)
+  prop.add(TAG_HW_GET_CPU_MEMORY, &[ 0, 0 ]);
+  prop.add(TAG_HW_GET_GPU_MEMORY, &[ 0, 0 ]);
+  let rv = prop.write(&mailbox());
+  if rv != PropertyMailboxCode::Ok { return None }
+
+  if let Some(&[ cpu_base, cpu_size ]) = prop.tag_result(TAG_HW_GET_CPU_MEMORY) {
+    if let Some(&[ gpu_base, gpu_size ]) = prop.tag_result(TAG_HW_GET_GPU_MEMORY) {
+      return Some(MemoryInfo { cpu_base, cpu_size, gpu_base, gpu_size })
+    }
+  }
+  None
 }
