@@ -76,6 +76,8 @@ impl Uart {
     // calculated from `FUARTCLK / (16 * baudrate)`.
     // ... this is 1.625, but i can't figure out what baud rate is intended.
     // a GPU clock speed of 250Mhz would be 9.6Mbps?!
+    // ... if uart speed is 3Mhz, `3M / (16 * 115200)` is approx 1.6276. we
+    // only get 0.016 accuracy with 16Q6.
     self.write(REG_IBRD, 1);
     self.write(REG_FBRD, 40);
 
