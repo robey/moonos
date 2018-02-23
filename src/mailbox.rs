@@ -73,7 +73,7 @@ const CODE_RESPONSE_ERROR: u32 = 0x80000001;
 
 #[derive(Debug, PartialEq)]
 pub enum PropertyMailboxCode {
-  Ok, NoReply, BadReply, Error
+  Ok, NoReply, BadReply, Error, Overrun
 }
 
 // the "property" channel takes an address to a buffer of:
@@ -91,26 +91,34 @@ impl PropertyMailbox {
   }
 
   pub fn add(&mut self, tag: u32, args: &[u32]) {
-    self.buffer[self.index] = tag;
-    self.buffer[self.index + 1] = (args.len() * 4) as u32;
-    self.buffer[self.index + 2] = 0;
-    self.index += 3;
-    for arg in args {
-      self.buffer[self.index] = *arg;
-      self.index += 1;
+    // do bounds check first, then unchecked sets, to avoid the panic code.
+    if self.index + 3 + args.len() >= self.buffer.len() { return }
+    unsafe {
+      *self.buffer.get_unchecked_mut(self.index) = tag;
+      *self.buffer.get_unchecked_mut(self.index + 1) = (args.len() * 4) as u32;
+      *self.buffer.get_unchecked_mut(self.index + 2) = 0;
+      self.index += 3;
+      for arg in args {
+        *self.buffer.get_unchecked_mut(self.index) = *arg;
+        self.index += 1;
+      }
     }
   }
 
   pub fn write(&mut self, mailbox: &Mailbox) -> PropertyMailboxCode {
-    self.buffer[self.index] = TAG_END;
-    // pad to align(16)
-    self.buffer[self.index + 1] = 0;
-    self.buffer[self.index + 2] = 0;
-    self.buffer[self.index + 3] = 0;
-    self.index += 4;
+    // do bounds check first, then unchecked sets, to avoid the panic code.
+    if self.index + 4 >= self.buffer.len() { return PropertyMailboxCode::Overrun }
+    unsafe {
+      *self.buffer.get_unchecked_mut(self.index) = TAG_END;
+      // pad to align(16)
+      *self.buffer.get_unchecked_mut(self.index + 1) = 0;
+      *self.buffer.get_unchecked_mut(self.index + 2) = 0;
+      *self.buffer.get_unchecked_mut(self.index + 3) = 0;
+      self.index += 4;
 
-    self.buffer[0] = ((self.index >> 2) << 4) as u32;
-    self.buffer[1] = CODE_REQUEST;
+      *self.buffer.get_unchecked_mut(0) = ((self.index >> 2) << 4) as u32;
+      *self.buffer.get_unchecked_mut(1) = CODE_REQUEST;
+    }
 
     // what in the name of the rose...
     let data = (&self.buffer as *const [u32] as *const u8 as usize as u32) >> 4;
@@ -121,23 +129,30 @@ impl PropertyMailbox {
   }
 
   pub fn find_tag(&self, tag: u32) -> Option<usize> {
-    let mut index = 2;
-    if self.buffer[0] < 16 { return None }
-    loop {
-      if self.buffer[index] == TAG_END { return None }
-      if self.buffer[index] == tag { return Some(index) }
-      index += 3 + (self.buffer[index + 1] >> 2) as usize;
+    unsafe {
+      let mut index = 2;
+      if *self.buffer.get_unchecked(0) < 16 { return None }
+      loop {
+        if index >= self.buffer.len() { return None }
+        if *self.buffer.get_unchecked(index) == TAG_END { return None }
+        if *self.buffer.get_unchecked(index) == tag { return Some(index) }
+        index += 3 + (*self.buffer.get_unchecked(index + 1) >> 2) as usize;
+      }
     }
   }
 
   pub fn tag_result(&self, tag: u32) -> Option<&[u32]> {
     self.find_tag(tag).and_then(|index| {
-      let response = self.buffer[index + 2];
-      if response & (1 << 31) == 0 {
-        None
-      } else {
-        let response_size = ((response & 0x7fff_ffff) >> 2) as usize;
-        Some(&self.buffer[index + 3 .. index + 3 + response_size])
+      if index + 3 >= self.buffer.len() { return None }
+      unsafe {
+        let response = *self.buffer.get_unchecked(index + 2);
+        if response & (1 << 31) == 0 {
+          None
+        } else {
+          let response_size = ((response & 0x7fff_ffff) >> 2) as usize;
+          if index + 3 + response_size >= self.buffer.len() { return None }
+          Some(self.buffer.get_unchecked(index + 3 .. index + 3 + response_size))
+        }
       }
     })
   }

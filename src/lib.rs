@@ -30,7 +30,7 @@ pub extern fn kernel_main() {
   console.init();
   console.puts("hello raspi kernel world!\r\n");
 
-  let info = mailbox::get_memory_info().unwrap();
+  let info = mailbox::get_memory_info().unwrap_or(mailbox::MemoryInfo { cpu_base: 0, cpu_size: 0, gpu_base: 0, gpu_size: 0});
   console.put_u32(info.cpu_base);
   console.putc(32);
   console.put_u32(info.cpu_size);

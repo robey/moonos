@@ -51,16 +51,22 @@ impl Framebuffer {
     }
   }
 
+  #[inline]
+  fn put_pixel(&mut self, offset: u32, color: u32) {
+    let bpp = self.depth >> 3;
+    self.framebuffer.as_mut().map(|fb| {
+      for i in 0..bpp {
+        fb.get_mut((offset + i) as usize).map(|fb| *fb = ((color >> (i * 8)) & 0xff) as u8);
+      }
+    });
+  }
+
   pub fn set_pixel(&mut self, x: u32, y: u32, color: u32) {
     if self.framebuffer.is_none() { return }
     let bpp = self.depth >> 3;
     let pitch = self.width * bpp;
     let offset = y * pitch + x * bpp;
-    self.framebuffer.as_mut().map(|fb| {
-      for i in 0..bpp {
-        fb[(offset + i) as usize] = ((color >> (i * 8)) & 0xff) as u8;
-      }
-    });
+    self.put_pixel(offset, color);
   }
 
   pub fn blit_glyph(&mut self, x: u32, y: u32, height: usize, glyph: &[u32], fg: u32, bg: u32) {
@@ -69,19 +75,15 @@ impl Framebuffer {
     let pitch = self.width * bpp;
     let mut line = y * pitch + x * bpp;
     let mut offset = line;
-    self.framebuffer.as_mut().map(|fb| {
-      for py in 0..height {
-        for px in 0..glyph.len() {
-          let color = if (glyph[px] >> py) & 1 != 0 { fg } else { bg };
-          for i in 0..bpp {
-            fb[(offset + i) as usize] = ((color >> (i * 8)) & 0xff) as u8;
-          }
-          offset += bpp;
-        }
-        line += pitch;
-        offset = line;
+    for py in 0..height {
+      for px in 0..glyph.len() {
+        let color = if (glyph[px] >> py) & 1 != 0 { fg } else { bg };
+        self.put_pixel(offset, color);
+        offset += bpp;
       }
-    });
+      line += pitch;
+      offset = line;
+    }
   }
 }
 
