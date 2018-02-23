@@ -2,22 +2,6 @@
 
 use core::intrinsics;
 
-// raspi 2, 3:
-const GPIO_BASE: isize = 0x3f200000;
-
-pub enum PudMode {
-  Off = 0,
-  // Pulldown = 1,
-  // Pullup = 2
-}
-
-// pull up/down:
-const REG_GPPUD: isize = 0x94;
-
-// clock the pull up/down into pins:
-const REG_GPPUDCLK0: isize = 0x98;
-const REG_GPPUDCLK1: isize = 0x9c;
-
 #[inline]
 pub fn delay(cycles: usize) {
   let mut _n = cycles;
@@ -47,56 +31,16 @@ pub fn wait_for_event() {
   unsafe { asm!("wfe" :::: "volatile") }
 }
 
-pub trait Mmio {
+pub trait Mmio<Reg: Into<isize>> {
   fn base(&self) -> *mut u8;
 
   #[inline]
-  fn read(&self, offset: isize) -> u32 {
-    unsafe { intrinsics::volatile_load(self.base().offset(offset) as *const u32) }
+  fn read(&self, reg: Reg) -> u32 {
+    unsafe { intrinsics::volatile_load(self.base().offset(reg.into()) as *const u32) }
   }
 
   #[inline]
-  fn write(&self, offset: isize, data: u32) {
-    unsafe { intrinsics::volatile_store(self.base().offset(offset) as *mut u32, data) }
+  fn write(&self, reg: Reg, data: u32) {
+    unsafe { intrinsics::volatile_store(self.base().offset(reg.into()) as *mut u32, data) }
   }
-}
-
-// GPIO controls
-pub struct Gpio {
-}
-
-impl Gpio {
-  pub fn new() -> Gpio {
-    Gpio { }
-  }
-
-  pub fn configure_pins(&self, mode: PudMode, pins: &[usize]) {
-    let mut mask0: u32 = 0;
-    let mut mask1: u32 = 0;
-    for i in 0..pins.len() {
-      let pin = pins[i];
-      if pin < 32 {
-        mask0 |= 1 << pin;
-      } else {
-        mask1 |= 1 << (pin - 32);
-      }
-    }
-
-    self.write(REG_GPPUD, mode as u32);
-    delay(150);
-    self.write(REG_GPPUDCLK0, mask0);
-    self.write(REG_GPPUDCLK1, mask1);
-    delay(150);
-    self.write(REG_GPPUDCLK0, 0);
-    self.write(REG_GPPUDCLK1, 0);
-  }
-}
-
-impl Mmio for Gpio {
-  #[inline]
-  fn base(&self) -> *mut u8 { GPIO_BASE as *mut u8 }
-}
-
-pub fn gpio() -> Gpio {
-  Gpio::new()
 }

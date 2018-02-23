@@ -4,10 +4,6 @@ use mmio::{barrier, Mmio, wait_for_event};
 
 const MAILBOX_BASE: isize = 0x3f00b880;
 
-const REG_READ: isize = 0x00;
-const REG_STATUS: isize = 0x18;
-const REG_WRITE: isize = 0x20;
-
 const STATUS_FULL: u32 = (1 << 31);
 const STATUS_EMPTY: u32 = (1 << 30);
 
@@ -16,6 +12,16 @@ const CHAN_PROPERTY: u8 = 8;
 const TAG_HW_GET_CPU_MEMORY: u32 = 0x00010005;
 const TAG_HW_GET_GPU_MEMORY: u32 = 0x00010006;
 const TAG_END: u32 = 0;
+
+enum Reg {
+  READ = 0x00,
+  STATUS = 0x18,
+  WRITE = 0x20,
+}
+
+impl Into<isize> for Reg {
+  fn into(self) -> isize { self as isize }
+}
 
 pub struct Mailbox {
 }
@@ -27,10 +33,10 @@ impl Mailbox {
 
   pub fn read_channel(&self, channel: u8) -> u32 {
     loop {
-      while self.read(REG_STATUS) & STATUS_EMPTY != 0 {
+      while self.read(Reg::STATUS) & STATUS_EMPTY != 0 {
         wait_for_event();
       }
-      let data = self.read(REG_READ);
+      let data = self.read(Reg::READ);
       if channel == (data & 0xf) as u8 {
         return data >> 4;
       }
@@ -39,15 +45,15 @@ impl Mailbox {
 
   pub fn write_channel(&self, channel: u8, data: u32) {
     barrier();
-    while self.read(REG_STATUS) & STATUS_FULL != 0 {
+    while self.read(Reg::STATUS) & STATUS_FULL != 0 {
       wait_for_event();
     }
-    self.write(REG_WRITE, (data << 4) | (channel as u32));
+    self.write(Reg::WRITE, (data << 4) | (channel as u32));
     barrier();
   }
 }
 
-impl Mmio for Mailbox {
+impl Mmio<Reg> for Mailbox {
   #[inline]
   fn base(&self) -> *mut u8 { MAILBOX_BASE as *mut u8 }
 }

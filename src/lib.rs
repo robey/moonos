@@ -5,6 +5,7 @@
 #![no_std]
 
 mod framebuffer;
+mod gpio;
 mod mailbox;
 mod mmio;
 mod uart;
