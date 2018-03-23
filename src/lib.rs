@@ -4,12 +4,15 @@
 #![feature(slice_patterns)]
 #![no_std]
 
+// implementations of memset, memcpy... builtins assumed by llvm:
+extern crate rlibc;
+
 mod limoncello;
-mod font;
 mod framebuffer;
 mod gpio;
 mod mailbox;
 mod mmio;
+mod text_screen;
 mod uart;
 
 // #[lang = "eh_personality"]
@@ -20,12 +23,6 @@ mod uart;
 #[no_mangle]
 pub extern fn rust_begin_panic(_msg: core::fmt::Arguments, _file: &'static str, _line: u32, _column: u32) -> ! {
   loop {}
-}
-
-// FIXME why
-#[no_mangle]
-pub extern fn memset(s: *mut u8, c: usize, n: isize) {
-  unsafe { for i in 0..n { *s.offset(i) = c as u8 } }
 }
 
 #[no_mangle]
@@ -48,15 +45,12 @@ pub extern fn kernel_main() {
   let mut fb = framebuffer::framebuffer();
   fb.set_size(640, 480, 24);
   fb.get_framebuffer();
-  fb.fill_box(0, 0, 640, 480, 0xff0000);
 
-  let myfont = font::Font::new(limoncello::FONT_WIDTH, limoncello::FONT_HEIGHT, &limoncello::FONT_DATA);
-  let mut x = 16;
-  let y = 14;
-  for c in "Hello raspi kernel world!".bytes() {
-    myfont.putc(&mut fb, x, y, c as u8, 0x00ffff, 0xff0000);
-    x += 8;
-  }
+  let mut screen = text_screen::TextScreen::new(fb, &text_screen::LIMONCELLO);
+  screen.bg_color = 0xff0000;
+  screen.fg_color = 0x00ffff;
+  screen.clear();
+  screen.write_string("CrapOS now booting, please stand by...\nLogistical excellence improving...\n");
 
   console.putc(0x52);
   console.putc(0x50);

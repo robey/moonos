@@ -9,9 +9,9 @@ const TAG_FB_SET_VIRTUAL_SIZE: u32 = 0x00048004;
 const TAG_FB_SET_DEPTH: u32 = 0x00048005;
 
 pub struct Framebuffer {
-  width: u32,
-  height: u32,
-  depth: u32,
+  pub width: u32,
+  pub height: u32,
+  pub depth: u32,
   framebuffer: Option<&'static mut [u8]>,
 }
 
@@ -73,8 +73,8 @@ impl Framebuffer {
   pub fn fill_box(&mut self, x: u32, y: u32, x2: u32, y2: u32, color: u32) {
     let mut line = y * self.pitch() + x * self.bpp();
     let mut offset = line;
-    for py in 0..(y2 - y) {
-      for px in 0..(x2 - x) {
+    for _py in 0..(y2 - y) {
+      for _px in 0..(x2 - x) {
         self.put_pixel(offset, color);
         offset += self.bpp();
       }
@@ -86,24 +86,10 @@ impl Framebuffer {
   pub fn blit_hline(&mut self, x: u32, y: u32, data: u32, width: usize, fg: u32, bg: u32) {
     let mut offset = y * self.pitch() + x * self.bpp();
     let mut bits = data;
-    for px in 0..width {
+    for _px in 0..width {
       self.put_pixel(offset, if bits & 1 != 0 { fg } else { bg });
       bits >>= 1;
       offset += self.bpp();
-    }
-  }
-
-  pub fn blit_glyph(&mut self, x: u32, y: u32, height: usize, glyph: &[u32], fg: u32, bg: u32) {
-    let mut line = y * self.pitch() + x * self.bpp();
-    let mut offset = line;
-    for py in 0..height {
-      for px in 0..glyph.len() {
-        let color = if (glyph[py] >> px) & 1 != 0 { fg } else { bg };
-        self.put_pixel(offset, color);
-        offset += self.bpp();
-      }
-      line += self.pitch();
-      offset = line;
     }
   }
 }
