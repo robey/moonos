@@ -20,6 +20,10 @@ impl Framebuffer {
     Framebuffer { width: 0, height: 0, depth: 0, framebuffer: None }
   }
 
+  fn bpp(&self) -> u32 { self.depth >> 3 }
+
+  fn pitch(&self) -> u32 { self.width * self.bpp() }
+
   pub fn set_size(&mut self, width: u32, height: u32, depth: u32) -> PropertyMailboxCode {
     let mut prop = PropertyMailbox::new();
     prop.add(TAG_FB_SET_SIZE, &[ width, height ]);
@@ -53,7 +57,7 @@ impl Framebuffer {
 
   #[inline]
   fn put_pixel(&mut self, offset: u32, color: u32) {
-    let bpp = self.depth >> 3;
+    let bpp = self.bpp();
     self.framebuffer.as_mut().map(|fb| {
       for i in 0..bpp {
         fb.get_mut((offset + i) as usize).map(|fb| *fb = ((color >> (i * 8)) & 0xff) as u8);
@@ -62,26 +66,43 @@ impl Framebuffer {
   }
 
   pub fn set_pixel(&mut self, x: u32, y: u32, color: u32) {
-    if self.framebuffer.is_none() { return }
-    let bpp = self.depth >> 3;
-    let pitch = self.width * bpp;
-    let offset = y * pitch + x * bpp;
+    let offset = y * self.pitch() + x * self.bpp();
     self.put_pixel(offset, color);
   }
 
+  pub fn fill_box(&mut self, x: u32, y: u32, x2: u32, y2: u32, color: u32) {
+    let mut line = y * self.pitch() + x * self.bpp();
+    let mut offset = line;
+    for py in 0..(y2 - y) {
+      for px in 0..(x2 - x) {
+        self.put_pixel(offset, color);
+        offset += self.bpp();
+      }
+      line += self.pitch();
+      offset = line;
+    }
+  }
+
+  pub fn blit_hline(&mut self, x: u32, y: u32, data: u32, width: usize, fg: u32, bg: u32) {
+    let mut offset = y * self.pitch() + x * self.bpp();
+    let mut bits = data;
+    for px in 0..width {
+      self.put_pixel(offset, if bits & 1 != 0 { fg } else { bg });
+      bits >>= 1;
+      offset += self.bpp();
+    }
+  }
+
   pub fn blit_glyph(&mut self, x: u32, y: u32, height: usize, glyph: &[u32], fg: u32, bg: u32) {
-    if self.framebuffer.is_none() { return }
-    let bpp = self.depth >> 3;
-    let pitch = self.width * bpp;
-    let mut line = y * pitch + x * bpp;
+    let mut line = y * self.pitch() + x * self.bpp();
     let mut offset = line;
     for py in 0..height {
       for px in 0..glyph.len() {
-        let color = if (glyph[px] >> py) & 1 != 0 { fg } else { bg };
+        let color = if (glyph[py] >> px) & 1 != 0 { fg } else { bg };
         self.put_pixel(offset, color);
-        offset += bpp;
+        offset += self.bpp();
       }
-      line += pitch;
+      line += self.pitch();
       offset = line;
     }
   }
