@@ -2,6 +2,7 @@
 
 use core::slice;
 use mailbox::{mailbox, PropertyMailbox, PropertyMailboxCode};
+use volatile::Volatile;
 
 const TAG_FB_GET_FRAMEBUFFER: u32 = 0x00040001;
 const TAG_FB_SET_SIZE: u32 = 0x00048003;
@@ -12,7 +13,7 @@ pub struct Framebuffer {
   pub width: u32,
   pub height: u32,
   pub depth: u32,
-  framebuffer: Option<&'static mut [u8]>,
+  framebuffer: Option<&'static mut [Volatile<u8>]>,
 }
 
 impl Framebuffer {
@@ -48,7 +49,8 @@ impl Framebuffer {
     if rv != PropertyMailboxCode::Ok { return rv }
 
     if let Some(&[ address, size ]) = prop.tag_result(TAG_FB_GET_FRAMEBUFFER) {
-      self.framebuffer = unsafe { Some(slice::from_raw_parts_mut(address as usize as *mut u8, size as usize)) };
+      let buffer = address as usize as *mut Volatile<u8>;
+      self.framebuffer = unsafe { Some(slice::from_raw_parts_mut(buffer, size as usize)) };
       PropertyMailboxCode::Ok
     } else {
       PropertyMailboxCode::BadReply
@@ -60,7 +62,7 @@ impl Framebuffer {
     let bpp = self.bpp();
     self.framebuffer.as_mut().map(|fb| {
       for i in 0..bpp {
-        fb.get_mut((offset + i) as usize).map(|fb| *fb = ((color >> (i * 8)) & 0xff) as u8);
+        fb.get_mut((offset + i) as usize).map(|fb| fb.write(((color >> (i * 8)) & 0xff) as u8));
       }
     });
   }

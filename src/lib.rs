@@ -7,6 +7,8 @@
 // implementations of memset, memcpy... builtins assumed by llvm:
 extern crate rlibc;
 
+extern crate volatile;
+
 mod limoncello;
 mod framebuffer;
 mod gpio;
