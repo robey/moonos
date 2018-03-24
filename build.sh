@@ -47,11 +47,13 @@ fi
 
 set -eux
 env RUSTFLAGS="--emit asm" xargo build --release
+# env RUSTFLAGS="--emit asm" xargo build
 
 # make bootable
 rm -rf target/kernel && mkdir -p target/kernel
 arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/boot.S -o target/kernel/boot.o
 arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
+# arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
 
 size -A -x target/kernel/myos.elf
 
