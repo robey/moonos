@@ -7,24 +7,21 @@ SECTIONS {
     __text_start = .;
     .text : {
         KEEP(*(.text.boot))
-        *(.text)
-        *(.text.*)
+        *(.text .text.*)
     }
     . = ALIGN(4096); /* align to page size */
     __text_end = .;
 
     __rodata_start = .;
     .rodata : {
-        *(.rodata)
-        *(.rodata.*)
+        *(.rodata .rodata.*)
     }
     . = ALIGN(4096); /* align to page size */
     __rodata_end = .;
 
     __data_start = .;
     .data : {
-        *(.data)
-        *(.data.*)
+        *(.data .data.*)
     }
     . = ALIGN(4096); /* align to page size */
     __data_end = .;
@@ -32,8 +29,7 @@ SECTIONS {
     __bss_start = .;
     .bss : {
         bss = .;
-        *(.bss)
-        *(.bss.*)
+        *(.bss .bss.*)
     }
     . = ALIGN(4096); /* align to page size */
     __bss_end = .;
