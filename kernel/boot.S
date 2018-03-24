@@ -32,5 +32,5 @@ _start:
     blx r3
 
 halt:
-    wfe
+    wfi
     b halt
