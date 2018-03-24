@@ -1,5 +1,6 @@
 use gpio::{gpio, PudMode};
-use mmio::{Mmio, wait_for_event};
+use mmio::Mmio;
+use native;
 
 // offsets into the memory-mapped uart base:
 #[allow(dead_code)]
@@ -113,7 +114,7 @@ impl Uart {
 
   pub fn getc(&self) -> u8 {
     while self.read(Reg::FR) & FR_RX_EMPTY != 0 {
-      wait_for_event();
+      native::delay_cycles(10);
     }
     self.putc(0x21);
     (self.read(Reg::DR) & 0xff) as u8

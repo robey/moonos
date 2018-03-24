@@ -1,6 +1,7 @@
 // weird "mailbox" RPC on the raspi, between the cpu and gpu
 
-use mmio::{barrier, Mmio, wait_for_event};
+use mmio::Mmio;
+use native;
 
 const MAILBOX_BASE: isize = 0x3f00b880;
 
@@ -34,7 +35,7 @@ impl Mailbox {
   pub fn read_channel(&self, channel: u8) -> u32 {
     loop {
       while self.read(Reg::STATUS) & STATUS_EMPTY != 0 {
-        wait_for_event();
+        native::delay_cycles(10);
       }
       let data = self.read(Reg::READ);
       if channel == (data & 0xf) as u8 {
@@ -44,12 +45,12 @@ impl Mailbox {
   }
 
   pub fn write_channel(&self, channel: u8, data: u32) {
-    barrier();
+    native::barrier();
     while self.read(Reg::STATUS) & STATUS_FULL != 0 {
-      wait_for_event();
+      native::delay_cycles(10);
     }
     self.write(Reg::WRITE, (data << 4) | (channel as u32));
-    barrier();
+    native::barrier();
   }
 }
 

@@ -1,4 +1,5 @@
-use mmio::{delay, Mmio};
+use mmio::Mmio;
+use native;
 
 // raspi 2, 3:
 const GPIO_BASE: isize = 0x3f200000;
@@ -45,10 +46,10 @@ impl Gpio {
     }
 
     self.write(Reg::GPPUD, mode as u32);
-    delay(150);
+    native::delay_cycles(150);
     self.write(Reg::GPPUDCLK0, mask0);
     self.write(Reg::GPPUDCLK1, mask1);
-    delay(150);
+    native::delay_cycles(150);
     self.write(Reg::GPPUDCLK0, 0);
     self.write(Reg::GPPUDCLK1, 0);
   }
