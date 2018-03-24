@@ -85,6 +85,46 @@ impl Framebuffer {
     }
   }
 
+  // FIXME this is ridiculous. we only need a scroll-up so just implement that.
+  pub fn move_box(&mut self, x: u32, y: u32, x2: u32, y2: u32, dest_x: u32, dest_y: u32) {
+    let rows = y2 - y;
+    let mut source_line = y * self.pitch();
+    let mut dest_line = dest_y * self.pitch();
+    let mut stride: isize = self.pitch() as isize;
+    if dest_y > y {
+      // bottom up
+      source_line += (rows - 1) * self.pitch();
+      dest_line += (rows - 1) * self.pitch();
+      stride = -stride;
+    }
+    for _py in 0..rows {
+      self.move_line(x, x2, dest_x, source_line, dest_line);
+      source_line = (source_line as isize + stride) as u32;
+      dest_line = (dest_line as isize + stride) as u32;
+    }
+  }
+
+  fn move_line(&mut self, x: u32, x2: u32, dest_x: u32, source_line: u32, dest_line: u32) {
+    let bytes = (x2 - x) * self.bpp();
+    let mut source_offset: usize = (source_line + x * self.bpp()) as usize;
+    let mut dest_offset: usize = (dest_line + dest_x * self.bpp()) as usize;
+    let mut stride: isize = 1;
+    if dest_x > x {
+      // right to left
+      source_offset += bytes as usize - 1;
+      dest_offset += bytes as usize - 1;
+      stride = -1;
+    }
+    self.framebuffer.as_mut().map(|fb| {
+      for _px in 0..bytes {
+        let data = fb.get_mut(source_offset as usize).map(|fb| fb.read()).unwrap_or(0);
+        fb.get_mut(dest_offset as usize).map(|fb| fb.write(data));
+        source_offset = (source_offset as isize + stride) as usize;
+        dest_offset = (dest_offset as isize + stride) as usize;
+      }
+    });
+  }
+
   pub fn blit_hline(&mut self, x: u32, y: u32, data: u32, width: usize, fg: u32, bg: u32) {
     let mut offset = y * self.pitch() + x * self.bpp();
     let mut bits = data;

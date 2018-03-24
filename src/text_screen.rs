@@ -1,3 +1,4 @@
+use core::fmt;
 use framebuffer::{Framebuffer};
 
 pub struct BitmapFont {
@@ -53,6 +54,15 @@ impl TextScreen {
     }
   }
 
+  pub fn move_to(&mut self, x: u32, y: u32) {
+    self.cursor_x = x;
+    self.cursor_y = y;
+    if self.cursor_x >= self.cols { self.cursor_x = 0; }
+    if self.cursor_y >= self.rows { self.cursor_y = 0; }
+    self.px = self.x_offset + self.cursor_x * self.font.width as u32;
+    self.py = self.y_offset + self.cursor_y * self.font.height as u32;
+  }
+
   // draw a character at the current position, without moving the cursor
   // or interpreting control codes.
   pub fn draw_char(&mut self, c: char) {
@@ -89,10 +99,11 @@ impl TextScreen {
 
   pub fn linefeed(&mut self) {
     self.cr();
-    self.cursor_y += 1;
-    self.py += self.font.height as u32;
-    if self.cursor_y >= self.rows {
-      // scroll...
+    if self.cursor_y >= self.rows - 1 {
+      self.scroll_up();
+    } else {
+      self.cursor_y += 1;
+      self.py += self.font.height as u32;
     }
   }
 
@@ -104,5 +115,28 @@ impl TextScreen {
     self.cursor_y = 0;
     self.px = self.x_offset;
     self.py = self.y_offset;
+  }
+
+  pub fn clear_line(&mut self, y: u32) {
+    let width = self.framebuffer.width;
+    let y_top = self.y_offset + y * self.font.height as u32;
+    let y_bottom = y_top + self.font.height as u32;
+    self.framebuffer.fill_box(0, y_top, width, y_bottom, self.bg_color);
+  }
+
+  fn scroll_up(&mut self) {
+    let width = self.framebuffer.width;
+    let y_top = self.y_offset + self.font.height as u32;
+    let y_bottom = self.y_offset + self.font.height as u32 * self.rows;
+    self.framebuffer.move_box(0, y_top, width, y_bottom, 0, 0);
+    let rows = self.rows;
+    self.clear_line(rows - 1);
+  }
+}
+
+impl fmt::Write for TextScreen {
+  fn write_str(&mut self, s: &str) -> fmt::Result {
+    self.write_string(s);
+    Ok(())
   }
 }
