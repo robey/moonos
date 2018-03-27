@@ -1,10 +1,15 @@
 #![feature(asm)]
+#![feature(compiler_builtins_lib)]
 #![feature(core_intrinsics)]
 #![feature(lang_items)]
 #![feature(slice_patterns)]
 #![no_std]
 
-// implementations of memset, memcpy... builtins assumed by llvm:
+// compiler intrinsics like __aeabi_memcpy and __aeabi_uidiv
+extern crate compiler_builtins;
+
+// implementations of memset, memcpy... builtins assumed by rust:
+// (this feels like a bug. they should be using __aeabi_memset)
 extern crate rlibc;
 
 extern crate volatile;
@@ -57,6 +62,7 @@ pub extern fn kernel_main() {
   let t1 = native::cycle_count();
   screen.write_string("CrapOS now booting, please stand by...\nLogistical excellence improving...\n");
   let t2 = native::cycle_count();
+  screen.write_string("© 2018 Gnashers of Insomnia\n1403 Französische Straße, Berlin\n");
   write!(screen, "cycles: {:0}\n", (t2 - t1) as u32).unwrap_or(());
   write!(screen, "The meaning of life is {}\n", 42).unwrap_or(());
   write!(screen, "What if I print a line of text that's so long that it will wrap around an 80-column screen?\n").unwrap_or(());

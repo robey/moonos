@@ -1,5 +1,7 @@
 #!/bin/bash
 
+RELEASE=1
+
 # embedded rust work on the raspi requires:
 #   - rustup (nvm/rvm for rust)
 #   - the nightly toolchain (rust stable is too old)
@@ -46,14 +48,20 @@ else
 fi
 
 set -eux
-env RUSTFLAGS="--emit asm" xargo build --release
-# env RUSTFLAGS="--emit asm" xargo build
+if test -z $RELEASE; then
+  env RUSTFLAGS="--emit asm" xargo build
+else
+  env RUSTFLAGS="--emit asm" xargo build --release
+fi
 
 # make bootable
 rm -rf target/kernel && mkdir -p target/kernel
 arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/boot.S -o target/kernel/boot.o
-arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
-# arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
+if test -z $RELEASE; then
+  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
+else
+  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
+fi
 
 size -A -x target/kernel/myos.elf
 

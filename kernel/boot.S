@@ -34,3 +34,8 @@ _start:
 halt:
     wfi
     b halt
+
+
+// arm calling convention:
+//   - r0 - r3: arguments, return values, scratch
+//   - r4 - r11: callee save
