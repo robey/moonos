@@ -1,10 +1,14 @@
 use core::fmt;
 use framebuffer::{Framebuffer};
 
+const REPLACEMENT_CHAR: char = 0xfffd as char;
+
 pub struct BitmapFont {
   pub width: usize,
   pub height: usize,
-  pub data: &'static [u8]
+  pub data: &'static [u8],
+  pub codepoints: &'static [u32],
+  pub codepoints_map: &'static [usize],
 }
 
 // built-in fonts:
@@ -13,7 +17,9 @@ use limoncello;
 pub static LIMONCELLO: BitmapFont = BitmapFont {
   width: limoncello::FONT_WIDTH,
   height: limoncello::FONT_HEIGHT,
-  data: &limoncello::FONT_DATA
+  data: &limoncello::FONT_DATA,
+  codepoints: &limoncello::FONT_CODEPOINTS,
+  codepoints_map: &limoncello::FONT_CODEPOINTS_MAP,
 };
 
 /// a consumed Framebuffer that displays text
@@ -66,12 +72,16 @@ impl TextScreen {
   // draw a character at the current position, without moving the cursor
   // or interpreting control codes.
   pub fn draw_char(&mut self, c: char) {
-    let font_offset = (c as usize) * self.font.height;
-    for i in 0..self.font.height {
-      let py = self.py + i as u32;
-      self.font.data.get(font_offset + i).map(|line| {
-        self.framebuffer.blit_hline(self.px, py, *line as u32, self.font.width, self.fg_color, self.bg_color);
-      });
+    if let Ok(index) = self.font.codepoints.binary_search(&(c as u32)).map(|i| self.font.codepoints_map[i]) {
+      let font_offset = index * self.font.height;
+      for i in 0..self.font.height {
+        let py = self.py + i as u32;
+        self.font.data.get(font_offset + i).map(|line| {
+          self.framebuffer.blit_hline(self.px, py, *line as u32, self.font.width, self.fg_color, self.bg_color);
+        });
+      }
+    } else if c != REPLACEMENT_CHAR {
+      self.draw_char(REPLACEMENT_CHAR);
     }
   }
 
