@@ -76,16 +76,27 @@ impl Framebuffer {
   }
 
   pub fn fill_box(&mut self, x: u32, y: u32, x2: u32, y2: u32, color: u32) {
-    let mut line = y * self.pitch() + x * self.bpp();
-    let mut offset = line;
-    for _py in 0..(y2 - y) {
-      for _px in 0..(x2 - x) {
-        self.put_pixel(offset, color);
-        offset += self.bpp();
-      }
-      line += self.pitch();
-      offset = line;
+    let pitch = self.pitch();
+    let width = (x2 - x) * self.bpp();
+    let mut line = (y * pitch + x * self.bpp()) as usize;
+
+    let mut offset = line as u32;
+    for _px in 0..(x2 - x) {
+      self.put_pixel(offset, color);
+      offset += self.bpp();
     }
+    line += pitch as usize;
+
+    self.framebuffer.as_mut().map(|fb| {
+      for _py in 1..(y2 - y) {
+        let source = line - pitch as usize;
+        let dest = line;
+        unsafe {
+          native::copy_memory(&mut fb[dest] as *mut u8, &mut fb[source] as *const u8, width as usize);
+        }
+        line += pitch as usize;
+      }
+    });
   }
 
   pub fn scroll_up(&mut self, lines: u32) {
