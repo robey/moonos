@@ -89,59 +89,12 @@ impl Framebuffer {
   }
 
   pub fn scroll_up(&mut self, lines: u32) {
-    let mut source_offset = (lines * self.pitch()) as usize;
-    let mut dest_offset = 0;
-    let pitch = self.pitch() as usize;
-    let height = self.height;
+    let source_offset = (lines * self.pitch()) as usize;
+    let dest_offset = 0;
+    let count = (self.pitch() * (self.height - lines)) as usize;
     self.framebuffer.as_mut().map(|fb| {
-      for _py in lines..height {
-        unsafe {
-          native::copy_memory(&mut fb[dest_offset] as *mut u8, &mut fb[source_offset] as *const u8, pitch);
-        }
-        dest_offset += pitch;
-        source_offset += pitch;
-      }
-    });
-  }
-
-  // FIXME this is ridiculous. we only need a scroll-up so just implement that.
-  pub fn move_box(&mut self, x: u32, y: u32, x2: u32, y2: u32, dest_x: u32, dest_y: u32) {
-    let rows = y2 - y;
-    let mut source_line = y * self.pitch();
-    let mut dest_line = dest_y * self.pitch();
-    let mut stride: isize = self.pitch() as isize;
-    if dest_y > y {
-      // bottom up
-      source_line += (rows - 1) * self.pitch();
-      dest_line += (rows - 1) * self.pitch();
-      stride = -stride;
-    }
-    for _py in 0..rows {
-      self.move_line(x, x2, dest_x, source_line, dest_line);
-      source_line = (source_line as isize + stride) as u32;
-      dest_line = (dest_line as isize + stride) as u32;
-    }
-  }
-
-  fn move_line(&mut self, x: u32, x2: u32, dest_x: u32, source_line: u32, dest_line: u32) {
-    let bytes = (x2 - x) * self.bpp();
-    let mut source_offset: usize = (source_line + x * self.bpp()) as usize;
-    let mut dest_offset: usize = (dest_line + dest_x * self.bpp()) as usize;
-    let mut stride: isize = 1;
-    if dest_x > x {
-      // right to left
-      source_offset += bytes as usize - 1;
-      dest_offset += bytes as usize - 1;
-      stride = -1;
-    }
-    self.framebuffer.as_mut().map(|fb| {
-      for _px in 0..bytes {
-        unsafe {
-          let data = fb.get_mut(source_offset as usize).map(|fb| intrinsics::volatile_load(fb)).unwrap_or(0);
-          fb.get_mut(dest_offset as usize).map(|fb| intrinsics::volatile_store(fb, data));
-        }
-        source_offset = (source_offset as isize + stride) as usize;
-        dest_offset = (dest_offset as isize + stride) as usize;
+      unsafe {
+        native::copy_memory(&mut fb[dest_offset] as *mut u8, &mut fb[source_offset] as *const u8, count);
       }
     });
   }
