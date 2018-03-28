@@ -1,7 +1,7 @@
 use core::fmt;
 use framebuffer::{Framebuffer};
 
-const REPLACEMENT_CHAR: char = 0xfffd as char;
+const REPLACEMENT_CHAR: char = '\u{FFFD}';
 
 pub struct BitmapFont {
   pub width: usize,
@@ -135,10 +135,11 @@ impl TextScreen {
   }
 
   fn scroll_up(&mut self) {
-    let width = self.framebuffer.width;
-    let y_top = self.y_offset + self.font.height as u32;
-    let y_bottom = self.y_offset + self.font.height as u32 * self.rows;
-    self.framebuffer.move_box(0, y_top, width, y_bottom, 0, 0);
+    // let width = self.framebuffer.width;
+    // let y_top = self.y_offset + self.font.height as u32;
+    // let y_bottom = self.y_offset + self.font.height as u32 * self.rows;
+    // self.framebuffer.move_box(0, y_top, width, y_bottom, 0, 0);
+    self.framebuffer.scroll_up(self.font.height as u32);
     let rows = self.rows;
     self.clear_line(rows - 1);
   }

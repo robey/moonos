@@ -1,8 +1,8 @@
 /// gpu-based framebuffer
 
-use core::slice;
+use core::{intrinsics, slice};
 use mailbox::{mailbox, PropertyMailbox, PropertyMailboxCode};
-use volatile::Volatile;
+use native;
 
 const TAG_FB_GET_FRAMEBUFFER: u32 = 0x00040001;
 const TAG_FB_SET_SIZE: u32 = 0x00048003;
@@ -13,7 +13,7 @@ pub struct Framebuffer {
   pub width: u32,
   pub height: u32,
   pub depth: u32,
-  framebuffer: Option<&'static mut [Volatile<u8>]>,
+  framebuffer: Option<&'static mut [u8]>,
 }
 
 impl Framebuffer {
@@ -49,7 +49,7 @@ impl Framebuffer {
     if rv != PropertyMailboxCode::Ok { return rv }
 
     if let Some(&[ address, size ]) = prop.tag_result(TAG_FB_GET_FRAMEBUFFER) {
-      let buffer = address as usize as *mut Volatile<u8>;
+      let buffer = address as usize as *mut u8;
       self.framebuffer = unsafe { Some(slice::from_raw_parts_mut(buffer, size as usize)) };
       PropertyMailboxCode::Ok
     } else {
@@ -62,7 +62,10 @@ impl Framebuffer {
     let bpp = self.bpp();
     self.framebuffer.as_mut().map(|fb| {
       for i in 0..bpp {
-        fb.get_mut((offset + i) as usize).map(|fb| fb.write(((color >> (i * 8)) & 0xff) as u8));
+        let byte = ((color >> (i * 8)) & 0xff) as u8;
+        unsafe {
+          fb.get_mut((offset + i) as usize).map(|fb| intrinsics::volatile_store(fb, byte));
+        }
       }
     });
   }
@@ -83,6 +86,22 @@ impl Framebuffer {
       line += self.pitch();
       offset = line;
     }
+  }
+
+  pub fn scroll_up(&mut self, lines: u32) {
+    let mut source_offset = (lines * self.pitch()) as usize;
+    let mut dest_offset = 0;
+    let pitch = self.pitch() as usize;
+    let height = self.height;
+    self.framebuffer.as_mut().map(|fb| {
+      for _py in lines..height {
+        unsafe {
+          native::copy_memory(&mut fb[dest_offset] as *mut u8, &mut fb[source_offset] as *const u8, pitch);
+        }
+        dest_offset += pitch;
+        source_offset += pitch;
+      }
+    });
   }
 
   // FIXME this is ridiculous. we only need a scroll-up so just implement that.
@@ -117,8 +136,10 @@ impl Framebuffer {
     }
     self.framebuffer.as_mut().map(|fb| {
       for _px in 0..bytes {
-        let data = fb.get_mut(source_offset as usize).map(|fb| fb.read()).unwrap_or(0);
-        fb.get_mut(dest_offset as usize).map(|fb| fb.write(data));
+        unsafe {
+          let data = fb.get_mut(source_offset as usize).map(|fb| intrinsics::volatile_load(fb)).unwrap_or(0);
+          fb.get_mut(dest_offset as usize).map(|fb| intrinsics::volatile_store(fb, data));
+        }
         source_offset = (source_offset as isize + stride) as usize;
         dest_offset = (dest_offset as isize + stride) as usize;
       }

@@ -58,3 +58,53 @@ pub fn delay_cycles(cycles: u32) {
     );
   }
 }
+
+pub unsafe fn copy_memory(mut dest: *mut u8, mut source: *const u8, mut count: usize) {
+  if (dest as usize & 15) == (source as usize & 15) {
+    // matched alignment
+
+    // copy bytes until we're word-aligned
+    while count > 0 && (dest as usize & 3) != 0 {
+      *dest = *source;
+      dest = dest.offset(1);
+      source = source.offset(1);
+      count -= 1;
+    }
+
+    while count >= 16 {
+      asm!(
+        "
+        ldmia r1!, {r4-r7}
+        stmia r0!, {r4-r7}
+        "
+        : "={r0}"(dest), "={r1}"(source)
+        : "{r0}"(dest), "{r1}"(source)
+        : "r4", "r5", "r6", "r7", "memory"
+        : "volatile"
+      );
+      count -= 16;
+    }
+
+    while count >= 4 {
+      asm!(
+        "
+        ldr r4, [r1], #4
+        str r4, [r0], #4
+        "
+        : "={r0}"(dest), "={r1}"(source)
+        : "{r0}"(dest), "{r1}"(source)
+        : "r4", "memory"
+        : "volatile"
+      );
+      count -= 4;
+    }
+  }
+
+  // remaining bytes
+  while count > 0 {
+    *dest = *source;
+    dest = dest.offset(1);
+    source = source.offset(1);
+    count -= 1;
+  }
+}

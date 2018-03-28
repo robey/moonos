@@ -12,7 +12,7 @@ extern crate compiler_builtins;
 // (this feels like a bug. they should be using __aeabi_memset)
 extern crate rlibc;
 
-extern crate volatile;
+// extern crate volatile;
 
 mod framebuffer;
 mod gpio;

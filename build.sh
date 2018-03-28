@@ -1,6 +1,9 @@
 #!/bin/bash
 
-RELEASE=1
+STYLE=release
+if test x"$1" = x"debug"; then
+  STYLE=debug
+fi
 
 # embedded rust work on the raspi requires:
 #   - rustup (nvm/rvm for rust)
@@ -48,19 +51,19 @@ else
 fi
 
 set -eux
-if test -z $RELEASE; then
-  env RUSTFLAGS="--emit asm" xargo build
-else
+if test $STYLE = release; then
   env RUSTFLAGS="--emit asm" xargo build --release
+else
+  env RUSTFLAGS="--emit asm" xargo build
 fi
 
 # make bootable
 rm -rf target/kernel && mkdir -p target/kernel
 arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/boot.S -o target/kernel/boot.o
-if test -z $RELEASE; then
-  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
-else
+if test $STYLE = release; then
   arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
+else
+  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
 fi
 
 size -A -x target/kernel/myos.elf
