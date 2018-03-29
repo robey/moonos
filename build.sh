@@ -5,6 +5,10 @@ if test x"$1" = x"debug"; then
   STYLE=debug
 fi
 
+FONTPROBS=/Users/robey/projects/node/font-problems/bin/font-problems
+LIMONCELLO=/Users/robey/Desktop/bitmap-fonts/limoncello.bmp
+LIMONCELLO_MAP=/Users/robey/Desktop/bitmap-fonts/limoncello.psfmap
+
 # embedded rust work on the raspi requires:
 #   - rustup (nvm/rvm for rust)
 #   - the nightly toolchain (rust stable is too old)
@@ -48,6 +52,11 @@ else
   mv .cargo/config .cargo/not-config
   cargo install xargo
   mv .cargo/not-config .cargo/config
+fi
+
+# temporary until limoncello is complete.
+if test -x $FONTPROBS; then
+  $FONTPROBS -m -v $LIMONCELLO src/limoncello.rs --map $LIMONCELLO_MAP --codemap
 fi
 
 set -eux

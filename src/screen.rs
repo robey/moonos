@@ -3,57 +3,67 @@
 use core::{intrinsics, slice};
 use mailbox::{mailbox, PropertyMailbox, PropertyMailboxCode};
 use native;
+use spin::Mutex;
 
 const TAG_FB_GET_FRAMEBUFFER: u32 = 0x00040001;
 const TAG_FB_SET_SIZE: u32 = 0x00048003;
 const TAG_FB_SET_VIRTUAL_SIZE: u32 = 0x00048004;
 const TAG_FB_SET_DEPTH: u32 = 0x00048005;
 
-pub struct Framebuffer {
+// accessible version of the global screen
+pub static SCREEN: Mutex<Screen> = Mutex::new(Screen::new());
+
+// initialize the global screen.
+pub fn screen_init(width: u32, height: u32, depth: u32) -> Result<(), PropertyMailboxCode> {
+  let mut s = SCREEN.lock();
+  s.set_size(width, height, depth).and_then(|()| s.get_framebuffer())
+}
+
+pub struct Screen {
   pub width: u32,
   pub height: u32,
   pub depth: u32,
   framebuffer: Option<&'static mut [u8]>,
 }
 
-impl Framebuffer {
-  pub fn new() -> Framebuffer {
-    Framebuffer { width: 0, height: 0, depth: 0, framebuffer: None }
+impl Screen {
+  pub const fn new() -> Screen {
+    Screen { width: 0, height: 0, depth: 0, framebuffer: None }
   }
 
   fn bpp(&self) -> u32 { self.depth >> 3 }
 
   fn pitch(&self) -> u32 { self.width * self.bpp() }
 
-  pub fn set_size(&mut self, width: u32, height: u32, depth: u32) -> PropertyMailboxCode {
+  pub fn set_size(&mut self, width: u32, height: u32, depth: u32) -> Result<(), PropertyMailboxCode> {
     let mut prop = PropertyMailbox::new();
     prop.add(TAG_FB_SET_SIZE, &[ width, height ]);
     prop.add(TAG_FB_SET_VIRTUAL_SIZE, &[ width, height ]);
     prop.add(TAG_FB_SET_DEPTH, &[ depth ]);
 
     let rv = prop.write(&mailbox());
-    if rv != PropertyMailboxCode::Ok { return rv }
+    if rv != PropertyMailboxCode::Ok { return Err(rv) }
 
     self.width = width;
     self.height = height;
     self.depth = depth;
-    rv
+    Ok(())
   }
 
-  pub fn get_framebuffer(&mut self) -> PropertyMailboxCode {
+  pub fn get_framebuffer(&mut self) -> Result<(), PropertyMailboxCode> {
     let mut prop = PropertyMailbox::new();
     // request align(16)
     prop.add(TAG_FB_GET_FRAMEBUFFER, &[ 16, 0 ]);
 
     let rv = prop.write(&mailbox());
-    if rv != PropertyMailboxCode::Ok { return rv }
+    if rv != PropertyMailboxCode::Ok { return Err(rv) }
 
     if let Some(&[ address, size ]) = prop.tag_result(TAG_FB_GET_FRAMEBUFFER) {
       let buffer = address as usize as *mut u8;
       self.framebuffer = unsafe { Some(slice::from_raw_parts_mut(buffer, size as usize)) };
-      PropertyMailboxCode::Ok
+      Ok(())
     } else {
-      PropertyMailboxCode::BadReply
+      Err(PropertyMailboxCode::BadReply)
     }
   }
 
@@ -119,8 +129,4 @@ impl Framebuffer {
       offset += self.bpp();
     }
   }
-}
-
-pub fn framebuffer() -> Framebuffer {
-  Framebuffer::new()
 }

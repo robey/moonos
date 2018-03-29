@@ -39,3 +39,7 @@ halt:
 // arm calling convention:
 //   - r0 - r3: arguments, return values, scratch
 //   - r4 - r11: callee save
+//   - r12: scratch
+//   - r13: SP
+//   - r14: LR
+//   - r15: PC
