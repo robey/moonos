@@ -6,6 +6,9 @@
 #![feature(slice_patterns)]
 #![no_std]
 
+// lots of constants and functions are defined for future use:
+#![allow(dead_code)]
+
 #[macro_use]
 mod text_display;
 
@@ -31,6 +34,7 @@ mod uart;
 
 use screen::screen_init;
 use text_display::TEXT_DISPLAY;
+use uart::{SERIAL0, UartRate};
 
 #[lang = "panic_fmt"]
 #[no_mangle]
@@ -43,20 +47,9 @@ pub extern fn kernel_main() {
   native::enable_cycle_counter();
 
   // FIXME should be global mutable mutex
-  let console = uart::Uart::new(uart::RPI2_UART0);
-  console.init();
+  let mut console = SERIAL0.lock();
+  console.init(UartRate::B115200);
   console.puts("hello raspi kernel world!\r\n");
-
-  mailbox::get_memory_info().map(|info| {
-    console.put_u32(info.cpu_base);
-    console.putc(32);
-    console.put_u32(info.cpu_size);
-    console.putc(32);
-    console.put_u32(info.gpu_base);
-    console.putc(32);
-    console.put_u32(info.gpu_size);
-    console.putc(10);
-  });
 
   screen_init(640, 480, 24).unwrap();
 
@@ -85,7 +78,8 @@ pub extern fn kernel_main() {
 
   loop {
     native::wait_for_event();
-    console.putc(console.getc());
+    let c = console.getc();
+    console.putc(c);
     console.putc(10);
   }
 }

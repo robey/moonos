@@ -1,10 +1,12 @@
 use mmio::Mmio;
 use native;
+use spin::Mutex;
+
+pub static GPIO: Mutex<Gpio> = Mutex::new(Gpio::new());
 
 // raspi 2, 3:
-const GPIO_BASE: isize = 0x3f200000;
+const GPIO_BASE: usize = 0x3f200000;
 
-#[allow(dead_code)]
 pub enum PudMode {
   Off = 0,
   Pulldown = 1,
@@ -29,11 +31,11 @@ pub struct Gpio {
 }
 
 impl Gpio {
-  pub fn new() -> Gpio {
+  pub const fn new() -> Gpio {
     Gpio { }
   }
 
-  pub fn configure_pins(&self, mode: PudMode, pins: &[usize]) {
+  pub fn configure_pins(&mut self, mode: PudMode, pins: &[usize]) {
     let mut mask0: u32 = 0;
     let mut mask1: u32 = 0;
     for i in 0..pins.len() {
@@ -56,10 +58,5 @@ impl Gpio {
 }
 
 impl Mmio<Reg> for Gpio {
-  #[inline]
-  fn base(&self) -> *mut u8 { GPIO_BASE as *mut u8 }
-}
-
-pub fn gpio() -> Gpio {
-  Gpio::new()
+  fn base(&self) -> usize { GPIO_BASE }
 }

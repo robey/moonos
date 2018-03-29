@@ -1,7 +1,7 @@
 /// gpu-based framebuffer
 
 use core::{intrinsics, slice};
-use mailbox::{mailbox, PropertyMailbox, PropertyMailboxCode};
+use mailbox::{MAILBOX, PropertyMailbox, PropertyMailboxCode};
 use native;
 use spin::Mutex;
 
@@ -41,7 +41,7 @@ impl Screen {
     prop.add(TAG_FB_SET_VIRTUAL_SIZE, &[ width, height ]);
     prop.add(TAG_FB_SET_DEPTH, &[ depth ]);
 
-    let rv = prop.write(&mailbox());
+    let rv = prop.write(&mut MAILBOX.lock());
     if rv != PropertyMailboxCode::Ok { return Err(rv) }
 
     self.width = width;
@@ -55,7 +55,7 @@ impl Screen {
     // request align(16)
     prop.add(TAG_FB_GET_FRAMEBUFFER, &[ 16, 0 ]);
 
-    let rv = prop.write(&mailbox());
+    let rv = prop.write(&mut MAILBOX.lock());
     if rv != PropertyMailboxCode::Ok { return Err(rv) }
 
     if let Some(&[ address, size ]) = prop.tag_result(TAG_FB_GET_FRAMEBUFFER) {

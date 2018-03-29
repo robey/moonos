@@ -2,8 +2,11 @@
 
 use mmio::Mmio;
 use native;
+use spin::Mutex;
 
-const MAILBOX_BASE: isize = 0x3f00b880;
+pub static MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());
+
+const MAILBOX_BASE: usize = 0x3f00b880;
 
 const STATUS_FULL: u32 = (1 << 31);
 const STATUS_EMPTY: u32 = (1 << 30);
@@ -28,11 +31,11 @@ pub struct Mailbox {
 }
 
 impl Mailbox {
-  pub fn new() -> Mailbox {
+  pub const fn new() -> Mailbox {
     Mailbox { }
   }
 
-  pub fn read_channel(&self, channel: u8) -> u32 {
+  pub fn read_channel(&mut self, channel: u8) -> u32 {
     loop {
       while self.read(Reg::STATUS) & STATUS_EMPTY != 0 {
         native::delay_cycles(10);
@@ -44,7 +47,7 @@ impl Mailbox {
     }
   }
 
-  pub fn write_channel(&self, channel: u8, data: u32) {
+  pub fn write_channel(&mut self, channel: u8, data: u32) {
     native::barrier();
     while self.read(Reg::STATUS) & STATUS_FULL != 0 {
       native::delay_cycles(10);
@@ -55,12 +58,7 @@ impl Mailbox {
 }
 
 impl Mmio<Reg> for Mailbox {
-  #[inline]
-  fn base(&self) -> *mut u8 { MAILBOX_BASE as *mut u8 }
-}
-
-pub fn mailbox() -> Mailbox {
-  Mailbox::new()
+  fn base(&self) -> usize { MAILBOX_BASE as usize }
 }
 
 
@@ -106,7 +104,7 @@ impl PropertyMailbox {
     }
   }
 
-  pub fn write(&mut self, mailbox: &Mailbox) -> PropertyMailboxCode {
+  pub fn write(&mut self, mailbox: &mut Mailbox) -> PropertyMailboxCode {
     // do bounds check first, then unchecked sets, to avoid the panic code.
     if self.index + 4 >= self.buffer.len() { return PropertyMailboxCode::Overrun }
     unsafe {
@@ -181,7 +179,7 @@ pub fn get_memory_info() -> Option<MemoryInfo> {
   // request align(16)
   prop.add(TAG_HW_GET_CPU_MEMORY, &[ 0, 0 ]);
   prop.add(TAG_HW_GET_GPU_MEMORY, &[ 0, 0 ]);
-  let rv = prop.write(&mailbox());
+  let rv = prop.write(&mut MAILBOX.lock());
   if rv != PropertyMailboxCode::Ok { return None }
 
   if let Some(&[ cpu_base, cpu_size ]) = prop.tag_result(TAG_HW_GET_CPU_MEMORY) {
