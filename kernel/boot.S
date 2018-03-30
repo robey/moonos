@@ -28,6 +28,8 @@ _start:
     cmp r4, r9
     blo 1b
 
+    ldr r0, =__end
+
     ldr r3, =kernel_main
     blx r3
 

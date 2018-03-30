@@ -9,9 +9,6 @@
 // lots of constants and functions are defined for future use:
 #![allow(dead_code)]
 
-#[macro_use]
-mod text_display;
-
 // compiler intrinsics like __aeabi_memcpy and __aeabi_uidiv
 extern crate compiler_builtins;
 
@@ -24,14 +21,18 @@ extern crate spin;
 
 // extern crate volatile;
 
+#[macro_use]
+mod console;
 mod gpio;
 mod limoncello;
 mod mailbox;
 mod mmio;
 mod native;
 mod screen;
+mod text_display;
 mod uart;
 
+use console::CONSOLE;
 use screen::screen_init;
 use text_display::TEXT_DISPLAY;
 use uart::{SERIAL0, UartRate};
@@ -43,13 +44,8 @@ pub extern fn rust_begin_panic(_msg: core::fmt::Arguments, _file: &'static str, 
 }
 
 #[no_mangle]
-pub extern fn kernel_main() {
+pub extern fn kernel_main(kernel_end: usize) {
   native::enable_cycle_counter();
-
-  // FIXME should be global mutable mutex
-  let mut console = SERIAL0.lock();
-  console.init(UartRate::B115200);
-  console.puts("hello raspi kernel world!\r\n");
 
   screen_init(640, 480, 24).unwrap();
 
@@ -61,25 +57,30 @@ pub extern fn kernel_main() {
     t.move_to(0, 33);
   }
 
+  {
+    let mut serial = SERIAL0.lock();
+    serial.init(UartRate::B115200);
+  }
+
+  CONSOLE.lock().set_serial(&SERIAL0);
+
   let t1 = native::cycle_count();
   print!("CrapOS now booting, please stand by...\n");
   let t2 = native::cycle_count();
 
   let mem = mailbox::get_memory_info().unwrap();
   print!("Memory: RAM {}MB, GPU {}MB\n", mem.cpu_size >> 20, mem.gpu_size >> 20);
+  print!("Kernel reaches {:08x}\n", kernel_end);
+  print!("\n");
+
   print!("© 2018 Gnashers of Insomnia\nFranzösische Straße 1403, Berlin\n");
   print!("cycles: {:0}\n", t2 - t1);
   print!("The meaning of life is {}\n", 42);
   print!("What if I print a line of text that's so long that it will wrap around an 80-column screen?\n");
 
-  console.putc(0x52);
-  console.putc(0x50);
-  console.putc(10);
-
   loop {
     native::wait_for_event();
-    let c = console.getc();
-    console.putc(c);
-    console.putc(10);
+    let c = SERIAL0.lock().read_char();
+    print!("{} ", c as u32);
   }
 }

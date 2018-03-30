@@ -3,16 +3,7 @@ use limoncello;
 use screen::{SCREEN, Screen};
 use spin::Mutex;
 
-macro_rules! print {
-  ($($arg:tt)*) => ($crate::text_display::print(format_args!($($arg)*)));
-}
-
 pub static TEXT_DISPLAY: Mutex<TextDisplay> = Mutex::new(TextDisplay::new(&SCREEN, &LIMONCELLO));
-
-pub fn print(args: fmt::Arguments) {
-  use core::fmt::Write;
-  TEXT_DISPLAY.lock().write_fmt(args).unwrap();
-}
 
 const REPLACEMENT_CHAR: char = '\u{FFFD}';
 

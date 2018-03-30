@@ -1,3 +1,4 @@
+use core::fmt;
 use gpio::{GPIO, PudMode};
 use mmio::Mmio;
 use native;
@@ -97,28 +98,24 @@ impl Uart {
     self.write(Reg::CR, CR_RX_ENABLE | CR_TX_ENABLE | CR_UART_ENABLE);
   }
 
-  pub fn putc(&mut self, c: u8) {
-    while self.read(Reg::FR) & FR_TX_FULL != 0 {}
+  pub fn write_char(&mut self, c: u8) {
+    while self.read(Reg::FR) & FR_TX_FULL != 0 {
+      native::delay_cycles(10);
+    }
     self.write(Reg::DR, c as u32)
   }
 
-  pub fn puts(&mut self, s: &str) {
-    for c in s.bytes() { self.putc(c) }
-  }
-
-  pub fn put_u32(&mut self, n: u32) {
-    self.putc(b'$');
-    for i in 0..8 {
-      let nybble = (n >> (28 - i * 4)) & 0xf;
-      self.putc(if nybble > 9 { 0x61 + nybble - 10 } else { 0x30 + nybble } as u8);
-    }
-  }
-
-  pub fn getc(&mut self) -> u8 {
+  pub fn read_char(&mut self) -> u8 {
     while self.read(Reg::FR) & FR_RX_EMPTY != 0 {
       native::delay_cycles(10);
     }
-    self.putc(0x21);
     (self.read(Reg::DR) & 0xff) as u8
+  }
+}
+
+impl fmt::Write for Uart {
+  fn write_str(&mut self, s: &str) -> Result<(), fmt::Error> {
+    for c in s.bytes() { self.write_char(c) }
+    Ok(())
   }
 }
