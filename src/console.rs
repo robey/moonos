@@ -1,7 +1,7 @@
 // draw on the VGA screen and the serial console at the same time.
 
 use core::fmt;
-use spin::Mutex;
+use spinlock::Mutex;
 use text_display::TEXT_DISPLAY;
 use uart::{Uart};
 

@@ -9,9 +9,7 @@ crate-type = [ "staticlib" ]
 
 [dependencies]
 rlibc = "1.0"
-# volatile = "0.2.3"
 compiler_builtins = { git = "https://github.com/rust-lang-nursery/compiler-builtins" }
-spin = "0.4.7"
 
 [profile.dev]
 panic = "abort"

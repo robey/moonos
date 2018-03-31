@@ -3,7 +3,7 @@
 use core::{intrinsics, slice};
 use mailbox::{MAILBOX, PropertyMailbox, PropertyMailboxCode};
 use native;
-use spin::Mutex;
+use spinlock::Mutex;
 
 const TAG_FB_GET_FRAMEBUFFER: u32 = 0x00040001;
 const TAG_FB_SET_SIZE: u32 = 0x00048003;

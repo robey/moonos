@@ -1,6 +1,6 @@
 use mmio::Mmio;
 use native;
-use spin::Mutex;
+use spinlock::Mutex;
 
 pub static GPIO: Mutex<Gpio> = Mutex::new(Gpio::new());
 

@@ -2,7 +2,7 @@
 
 use mmio::Mmio;
 use native;
-use spin::Mutex;
+use spinlock::Mutex;
 
 pub static MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());
 

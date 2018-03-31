@@ -2,7 +2,7 @@ use core::fmt;
 use gpio::{GPIO, PudMode};
 use mmio::Mmio;
 use native;
-use spin::Mutex;
+use spinlock::Mutex;
 
 pub static SERIAL0: Mutex<Uart> = Mutex::new(Uart::new(RPI2_UART0));
 

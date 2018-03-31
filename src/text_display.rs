@@ -1,7 +1,7 @@
 use core::fmt;
 use limoncello;
 use screen::{SCREEN, Screen};
-use spin::Mutex;
+use spinlock::Mutex;
 
 pub static TEXT_DISPLAY: Mutex<TextDisplay> = Mutex::new(TextDisplay::new(&SCREEN, &LIMONCELLO));
 

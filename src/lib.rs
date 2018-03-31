@@ -16,11 +16,6 @@ extern crate compiler_builtins;
 // (this feels like a bug. they should be using __aeabi_memset)
 extern crate rlibc;
 
-// spinlocks
-extern crate spin;
-
-// extern crate volatile;
-
 #[macro_use]
 mod console;
 mod gpio;
@@ -29,6 +24,7 @@ mod mailbox;
 mod mmio;
 mod native;
 mod screen;
+mod spinlock;
 mod text_display;
 mod uart;
 
