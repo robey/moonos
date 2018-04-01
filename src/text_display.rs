@@ -59,12 +59,31 @@ impl TextDisplay {
     }
   }
 
+  pub fn init(&mut self, fg_color: u32, bg_color: u32) {
+    self.bg_color = bg_color;
+    self.fg_color = fg_color;
+    self.clear();
+  }
+
   pub fn resize(&mut self) {
     let s = self.screen.lock();
     self.rows = s.height / self.font.height as u32;
     self.cols = s.width / self.font.width as u32;
     self.x_offset = (s.width - self.cols * self.font.width as u32) >> 1;
     self.y_offset = (s.height - self.rows * self.font.height as u32) >> 1;
+  }
+
+  // clear screen, and resize in case the display size changed.
+  pub fn clear(&mut self) {
+    self.resize();
+    let mut s = self.screen.lock();
+    let width = s.width;
+    let height = s.height;
+    s.fill_box(0, 0, width, height, self.bg_color);
+    self.cursor_x = 0;
+    self.cursor_y = 0;
+    self.px = self.x_offset;
+    self.py = self.y_offset;
   }
 
   pub fn move_to(&mut self, x: u32, y: u32) {
@@ -123,18 +142,6 @@ impl TextDisplay {
       self.cursor_y += 1;
       self.py += self.font.height as u32;
     }
-  }
-
-  pub fn clear(&mut self) {
-    self.resize();
-    let mut s = self.screen.lock();
-    let width = s.width;
-    let height = s.height;
-    s.fill_box(0, 0, width, height, self.bg_color);
-    self.cursor_x = 0;
-    self.cursor_y = 0;
-    self.px = self.x_offset;
-    self.py = self.y_offset;
   }
 
   pub fn clear_line(&mut self, y: u32) {

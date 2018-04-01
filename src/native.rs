@@ -19,6 +19,10 @@ pub fn wait_for_interrupt() {
   unsafe { asm!("wfi" :::: "volatile") };
 }
 
+pub fn halt() -> ! {
+  loop { wait_for_interrupt(); };
+}
+
 // the cycle counter has to be explicitly turned on.
 pub fn enable_cycle_counter() {
   let mut _r: u32 = 1;
@@ -55,6 +59,21 @@ pub fn delay_cycles(cycles: u32) {
       : "0"(_n)     // inputs
       : "cc"        // clobbers
       : "volatile"  // options
+    );
+  }
+}
+
+#[inline]
+pub fn syscall(syscall_number: usize, param1: usize) {
+  unsafe {
+    asm!(
+      "
+      swi #0
+      "
+      :    // outputs
+      : "{r4}"(syscall_number), "{r0}"(param1)
+      : "r0", "r1", "r2", "r3", "r12", "cc"
+      : "volatile"
     );
   }
 }

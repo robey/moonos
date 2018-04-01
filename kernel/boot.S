@@ -29,6 +29,7 @@ _start:
     blo 1b
 
     ldr r0, =__end
+    ldr r1, =_exception_vector
 
     ldr r3, =kernel_main
     blx r3

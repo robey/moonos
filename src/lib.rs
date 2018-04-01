@@ -18,6 +18,7 @@ extern crate rlibc;
 
 #[macro_use]
 mod console;
+mod debug;
 mod gpio;
 mod limoncello;
 mod mailbox;
@@ -27,46 +28,53 @@ mod screen;
 mod spinlock;
 mod text_display;
 mod uart;
+pub mod vectors;
 
 use console::CONSOLE;
 use screen::screen_init;
 use text_display::TEXT_DISPLAY;
 use uart::{SERIAL0, UartRate};
 
+const CONSOLE_BG: u32 = 0x006000;
+const CONSOLE_FG: u32 = 0xffffff;
+
 #[lang = "panic_fmt"]
 #[no_mangle]
 pub extern fn rust_begin_panic(_msg: core::fmt::Arguments, _file: &'static str, _line: u32, _column: u32) -> ! {
-  loop {}
+  native::halt();
 }
 
 #[no_mangle]
-pub extern fn kernel_main(kernel_end: usize) {
+pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   native::enable_cycle_counter();
 
-  screen_init(640, 480, 24).unwrap();
-
-  {
-    let mut t = TEXT_DISPLAY.lock();
-    t.bg_color = 0xff0000;
-    t.fg_color = 0xffffff;
-    t.clear();
-    t.move_to(0, 33);
+  // first, set up the display & serial console, so we can log.
+  SERIAL0.lock().init(UartRate::B115200);
+  if screen_init(640, 480, 24).is_err() {
+    if SERIAL0.lock().write_str("ERR\n").is_err() {
+      // can't do anything.
+    }
+    native::halt();
   }
 
-  {
-    let mut serial = SERIAL0.lock();
-    serial.init(UartRate::B115200);
-  }
-
+  TEXT_DISPLAY.lock().init(CONSOLE_FG, CONSOLE_BG);
   CONSOLE.lock().set_serial(&SERIAL0);
 
-  let t1 = native::cycle_count();
-  print!("CrapOS now booting, please stand by...\n");
-  let t2 = native::cycle_count();
+  print!("CrapOS booting...\n");
 
+  // copy 16 words from exception_vector to 0x0, where ARM expects.
+  // (these are defined in vectors.S)
+  unsafe {
+    native::copy_memory(0 as *mut u8, exception_vector as *const u8, 16 * 8);
+  }
+  native::syscall(1, 197);
+
+  let t1 = native::cycle_count();
   let mem = mailbox::get_memory_info().unwrap();
+  let t2 = native::cycle_count();
   print!("Memory: RAM {}MB, GPU {}MB\n", mem.cpu_size >> 20, mem.gpu_size >> 20);
   print!("Kernel reaches {:08x}\n", kernel_end);
+  print!("Exception vector: {:08x}\n", exception_vector);
   print!("\n");
 
   print!("© 2018 Gnashers of Insomnia\nFranzösische Straße 1403, Berlin\n");

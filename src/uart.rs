@@ -105,6 +105,11 @@ impl Uart {
     self.write(Reg::DR, c as u32)
   }
 
+  pub fn write_str(&mut self, s: &str) -> Result<(), fmt::Error> {
+    for c in s.bytes() { self.write_char(c) }
+    Ok(())
+  }
+
   pub fn read_char(&mut self) -> u8 {
     while self.read(Reg::FR) & FR_RX_EMPTY != 0 {
       native::delay_cycles(10);
@@ -115,7 +120,6 @@ impl Uart {
 
 impl fmt::Write for Uart {
   fn write_str(&mut self, s: &str) -> Result<(), fmt::Error> {
-    for c in s.bytes() { self.write_char(c) }
-    Ok(())
+    self.write_str(s)
   }
 }

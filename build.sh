@@ -66,13 +66,17 @@ else
   env RUSTFLAGS="--emit asm" xargo build
 fi
 
-# make bootable
+# build asm
 rm -rf target/kernel && mkdir -p target/kernel
-arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/boot.S -o target/kernel/boot.o
+for filename in boot vectors; do
+  arm-none-eabi-gcc -mcpu=cortex-a7 -fpic -ffreestanding -c kernel/${filename}.S -o target/kernel/${filename}.o
+done
+
+# make bootable
 if test $STYLE = release; then
-  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
+  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/kernel/vectors.o target/armv7-unknown-linux-gnueabihf/release/libmoon.a
 else
-  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
+  arm-none-eabi-gcc -mfloat-abi=hard -n -T kernel/linker.ld -o target/kernel/myos.elf -ffreestanding -O2 -nostdlib -Wl,--gc-sections target/kernel/boot.o target/kernel/vectors.o target/armv7-unknown-linux-gnueabihf/debug/libmoon.a
 fi
 
 size -A -x target/kernel/myos.elf

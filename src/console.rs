@@ -3,7 +3,7 @@
 use core::fmt;
 use spinlock::Mutex;
 use text_display::TEXT_DISPLAY;
-use uart::{Uart};
+use uart::Uart;
 
 macro_rules! print {
   ($($arg:tt)*) => ($crate::console::print(format_args!($($arg)*)));
@@ -36,6 +36,5 @@ impl fmt::Write for Console {
 }
 
 pub fn print(args: fmt::Arguments) {
-  // TEXT_DISPLAY.lock().write_fmt(args).unwrap();
   fmt::write(&mut *CONSOLE.lock(), args).unwrap();
 }
