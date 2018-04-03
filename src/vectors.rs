@@ -1,3 +1,4 @@
+use debug;
 use native;
 
 #[no_mangle]
@@ -13,11 +14,14 @@ pub extern fn vector_undefined() {
 }
 
 #[no_mangle]
-pub extern fn syscall_zero(n: usize) {
+pub extern fn syscall_zero(n: usize, _a: usize, _b: usize, _c: usize) -> usize {
   print!("\nSYSCALL ZERO {}\n", n);
+  debug::dump(_c);
+  n * 2
 }
 
 #[no_mangle]
-pub extern fn syscall_one(n: usize) {
+pub extern fn syscall_one(n: usize) -> usize {
   print!("\nSYSCALL ONE {}\n", n);
+  return n * 2;
 }

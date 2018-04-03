@@ -67,7 +67,7 @@ pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   unsafe {
     native::copy_memory(0 as *mut u8, exception_vector as *const u8, 16 * 8);
   }
-  native::syscall(1, 197);
+  print!("rv = {}\n", native::syscall(0, 23, 0, 0, 0));
 
   let t1 = native::cycle_count();
   let mem = mailbox::get_memory_info().unwrap();

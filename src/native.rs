@@ -64,18 +64,18 @@ pub fn delay_cycles(cycles: u32) {
 }
 
 #[inline]
-pub fn syscall(syscall_number: usize, param1: usize) {
+pub fn syscall(syscall_number: usize, param1: usize, param2: usize, param3: usize, param4: usize) -> usize {
+  let mut _rv: usize;
   unsafe {
     asm!(
-      "
-      swi #0
-      "
-      :    // outputs
-      : "{r4}"(syscall_number), "{r0}"(param1)
+      "svc #241"
+      : "={r0}"(_rv)
+      : "{r4}"(syscall_number), "{r0}"(param1), "{r1}"(param2), "{r2}"(param3), "{r3}"(param4)
       : "r0", "r1", "r2", "r3", "r12", "cc"
       : "volatile"
     );
   }
+  _rv
 }
 
 pub unsafe fn copy_memory(mut dest: *mut u8, mut source: *const u8, mut count: usize) {
