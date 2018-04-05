@@ -23,7 +23,7 @@ _exception_vector:
   nop
   nop
   nop
-  nop
+  ldr pc, vector_irq_handler_addr
   nop
 
 //  ldr pc, prefetch_abort_handler_abs_addr
@@ -37,7 +37,7 @@ vector_undefined_addr:      .word vector_undefined_setup
 vector_syscall_addr:        .word vector_syscall_setup
 @ prefetch_abort_handler_abs_addr:        .word prefetch_abort_handler
 @ data_abort_handler_abs_addr:            .word data_abort_handler
-@ irq_handler_abs_addr:                   .word irq_handler_asm_wrapper
+vector_irq_handler_addr:    .word vector_irq_handler_setup
 @ fast_irq_handler_abs_addr:              .word fast_irq_handler
 
 vector_undefined_setup:
@@ -67,17 +67,25 @@ vector_syscall_setup:
   unsave_all_registers
   bx lr
 
+vector_irq_handler_setup:
+  // save lr, spsr on supervisor stack, then switch back to supervisor mode
+  // with interrupts disabled.
+  sub lr, lr, #4
+  srsdb sp!, #0x13
+  cpsid if, #0x13
+  // save trash registers, round SP to align(8).
+  push {r0-r3, r12, lr}
+  and r1, sp, #4
+  sub sp, sp, r1
+  push {r1}
+  bl vector_irq_handler
+  // restore everything and return from exception.
+  pop {r1}
+  add sp, sp, r1
+  pop {r0-r3, r12, lr}
+  rfeia sp!
+
 vector_syscalls:
   .word syscall_zero
   .word syscall_one
 vector_syscalls_end:
-
-// .data
-// .section ".data.saved_registers"
-//
-// _saved_registers:
-//   .rept 14
-//   .word 0x23
-//   .endr
-//   .word 0x19
-//   .word 0xff003322

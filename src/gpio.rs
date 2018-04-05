@@ -1,11 +1,9 @@
 use mmio::Mmio;
 use native;
+use raspi;
 use spinlock::Mutex;
 
 pub static GPIO: Mutex<Gpio> = Mutex::new(Gpio::new());
-
-// raspi 2, 3:
-const GPIO_BASE: usize = 0x3f200000;
 
 pub enum PudMode {
   Off = 0,
@@ -58,5 +56,5 @@ impl Gpio {
 }
 
 impl Mmio<Reg> for Gpio {
-  fn base(&self) -> usize { GPIO_BASE }
+  fn base(&self) -> usize { raspi::GPIO_BASE }
 }

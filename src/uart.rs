@@ -2,9 +2,10 @@ use core::fmt;
 use gpio::{GPIO, PudMode};
 use mmio::Mmio;
 use native;
+use raspi;
 use spinlock::Mutex;
 
-pub static SERIAL0: Mutex<Uart> = Mutex::new(Uart::new(RPI2_UART0));
+pub static SERIAL0: Mutex<Uart> = Mutex::new(Uart::new(raspi::UART0_BASE));
 
 // offsets into the memory-mapped uart base:
 enum Reg {
@@ -31,9 +32,6 @@ impl Into<isize> for Reg {
 // pin assignments
 const PIN_TXD0: usize = 14;
 const PIN_RXD0: usize = 15;
-
-const RPI1_UART0: usize = 0x20201000;
-const RPI2_UART0: usize = 0x3f201000;
 
 const FR_TX_FULL: u32 = (1 << 5);
 const FR_RX_EMPTY: u32 = (1 << 4);

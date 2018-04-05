@@ -1,6 +1,29 @@
 
 // asm(text : outputs : inputs : clobbers : options)
 
+enum ProcessorMode {
+  User = 0x10,
+  Fiq = 0x11,
+  Irq = 0x12,
+  Supervisor = 0x13,
+  Abort = 0x17,
+  Undefined = 0x1b,
+  System = 0x1f,
+}
+
+enum ProcessorFlags {
+  Thumb = 1 << 5,
+  DisableFiq = 1 << 6,
+  DisableIrq = 1 << 7,
+  Abort = 1 << 8,
+  Endian = 1 << 9,
+  StickyOverflow = 1 << 27,
+  Overflow = 1 << 28,
+  Carry = 1 << 29,
+  Zero = 1 << 30,
+  Negative = 1 << 31,
+}
+
 // "data synchronization barrier"
 #[inline]
 pub fn barrier() {
@@ -64,11 +87,32 @@ pub fn delay_cycles(cycles: u32) {
 }
 
 #[inline]
+pub fn interrupts_enabled() -> bool {
+  let mut _rv: usize = 0;
+  unsafe { asm!("mrs $0, cpsr" : "=r"(_rv) ::: "volatile") };
+  _rv & ProcessorFlags::DisableIrq as usize == 0
+}
+
+#[inline]
+pub fn enable_interrupts() {
+  if !interrupts_enabled() {
+    unsafe { asm!("cpsie i" :::: "volatile") };
+  }
+}
+
+#[inline]
+pub fn disable_interrupts() {
+  if interrupts_enabled() {
+    unsafe { asm!("cpsid i" :::: "volatile") };
+  }
+}
+
+#[inline]
 pub fn syscall(syscall_number: usize, param1: usize, param2: usize, param3: usize, param4: usize) -> usize {
   let mut _rv: usize;
   unsafe {
     asm!(
-      "svc #241"
+      "svc #0"
       : "={r0}"(_rv)
       : "{r4}"(syscall_number), "{r0}"(param1), "{r1}"(param2), "{r2}"(param3), "{r3}"(param4)
       : "r0", "r1", "r2", "r3", "r12", "cc"

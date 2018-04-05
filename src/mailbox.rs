@@ -2,11 +2,10 @@
 
 use mmio::Mmio;
 use native;
+use raspi;
 use spinlock::Mutex;
 
 pub static MAILBOX: Mutex<Mailbox> = Mutex::new(Mailbox::new());
-
-const MAILBOX_BASE: usize = 0x3f00b880;
 
 const STATUS_FULL: u32 = (1 << 31);
 const STATUS_EMPTY: u32 = (1 << 30);
@@ -58,7 +57,7 @@ impl Mailbox {
 }
 
 impl Mmio<Reg> for Mailbox {
-  fn base(&self) -> usize { MAILBOX_BASE as usize }
+  fn base(&self) -> usize { raspi::MAILBOX_BASE }
 }
 
 
