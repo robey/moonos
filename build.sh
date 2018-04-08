@@ -81,4 +81,5 @@ fi
 
 size -A -x target/kernel/myos.elf
 
-qemu-system-arm -m 256 -M raspi2 -serial stdio -kernel target/kernel/myos.elf
+# make a file for the raspi
+arm-none-eabi-objcopy target/kernel/myos.elf -O binary target/kernel/kernel7.img
