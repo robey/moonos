@@ -11,7 +11,8 @@ pub type InterruptHandler = fn (interrupt: usize) -> ();
 pub type InterruptClearer = fn (interrupt: usize) -> ();
 
 pub enum Interrupt {
-  Timer = 1,
+  Timer1 = 1,
+  Timer3 = 3,
 }
 
 // offsets into the memory-mapped uart base:
