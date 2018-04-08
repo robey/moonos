@@ -7,10 +7,8 @@ pub static INTERRUPTS: Mutex<Interrupts> = Mutex::new(Interrupts::new());
 
 pub const IRQ_COUNT: usize = 72;
 
-pub trait InterruptHandler : Sync {
-  fn handle_interrupt(&self, interrupt: usize) -> ();
-  fn clear_interrupt(&self, interrupt: usize) -> ();
-}
+pub type InterruptHandler = fn (interrupt: usize) -> ();
+pub type InterruptClearer = fn (interrupt: usize) -> ();
 
 pub enum Interrupt {
   Timer = 1,
@@ -36,7 +34,8 @@ impl Into<isize> for Reg {
 
 
 pub struct Interrupts {
-  handlers: [Option<&'static InterruptHandler>; IRQ_COUNT],
+  handlers: [Option<InterruptHandler>; IRQ_COUNT],
+  clearers: [Option<InterruptClearer>; IRQ_COUNT],
 }
 
 impl Mmio<Reg> for Interrupts {
@@ -45,7 +44,7 @@ impl Mmio<Reg> for Interrupts {
 
 impl Interrupts {
   pub const fn new() -> Interrupts {
-    Interrupts { handlers: [None; IRQ_COUNT] }
+    Interrupts { handlers: [None; IRQ_COUNT], clearers: [None; IRQ_COUNT] }
   }
 
   pub fn init(&mut self) {
@@ -57,24 +56,21 @@ impl Interrupts {
     native::enable_interrupts();
   }
 
-  pub fn register(&mut self, interrupt: Interrupt, handler: &'static InterruptHandler) {
-    let n = interrupt as usize;
-    if n <= IRQ_COUNT {
-      if n < 32 {
-        let x = self.read(Reg::EnableGpu1) | (1 << n);
-        self.write(Reg::EnableGpu1, x);
-      } else if n < 64 {
-        let x = self.read(Reg::EnableGpu2) | (1 << (n - 32));
-        self.write(Reg::EnableGpu2, x);
+  pub fn register(&mut self, interrupt: usize, handler: InterruptHandler, clearer: InterruptClearer) {
+    if interrupt <= IRQ_COUNT {
+      if interrupt < 32 {
+        self.write(Reg::EnableGpu1, 1 << interrupt);
+      } else if interrupt < 64 {
+        self.write(Reg::EnableGpu2, 1 << (interrupt - 32));
       } else {
-        let x = self.read(Reg::EnableBasic) | (1 << (n - 64));
-        self.write(Reg::EnableBasic, x);
+        self.write(Reg::EnableBasic, 1 << (interrupt - 64));
       }
-      self.handlers[n] = Some(handler);
+      self.handlers[interrupt] = Some(handler);
+      self.clearers[interrupt] = Some(clearer);
     }
   }
 
-  fn next_pending_interrupt(&mut self) -> Option<u32> {
+  pub fn next_pending_interrupt(&mut self) -> Option<u32> {
     let pending_gpu1 = self.read(Reg::PendingGpu1);
     if pending_gpu1 != 0 {
       return Some(pending_gpu1.trailing_zeros());
@@ -93,12 +89,13 @@ impl Interrupts {
 
 #[no_mangle]
 pub extern fn vector_irq_handler() {
+  // FIXME: don't compete with kernel for interrupt lock. bad bad.
   let mut i = INTERRUPTS.lock();
   if let Some(interrupt) = i.next_pending_interrupt() {
     if let Some(handler) = i.handlers[interrupt as usize] {
-      handler.clear_interrupt(interrupt as usize);
+      i.clearers[interrupt as usize].map(|f| f(interrupt as usize));
       native::enable_interrupts();
-      handler.handle_interrupt(interrupt as usize);
+      handler(interrupt as usize);
       native::disable_interrupts();
     }
   }
