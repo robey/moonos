@@ -1,10 +1,9 @@
-use core::convert::TryFrom;
+use core::convert::{TryFrom};
 use interrupts::{Interrupt, INTERRUPTS};
 use mmio::Mmio;
 use raspi;
-use spinlock::Mutex;
 
-pub static TIMER: Mutex<Timer> = Mutex::new(Timer::new());
+pub static TIMER: Timer = Timer::new();
 
 enum Reg {
   Control = 0,
@@ -33,31 +32,31 @@ impl Timer {
     Timer { }
   }
 
-  pub fn init(&mut self) {
+  pub fn init(&self) {
     // only 1 and 3 are available, because the other 2 are used by the GPU.
     self.clear(Interrupt::Timer1);
     self.clear(Interrupt::Timer3);
-    INTERRUPTS.lock().register(Interrupt::Timer1 as usize, handle_interrupt, clear_interrupt);
-    INTERRUPTS.lock().register(Interrupt::Timer3 as usize, handle_interrupt, clear_interrupt);
+    INTERRUPTS.register(Interrupt::Timer1 as usize, handle_interrupt, clear_interrupt);
+    INTERRUPTS.register(Interrupt::Timer3 as usize, handle_interrupt, clear_interrupt);
   }
 
-  pub fn clear(&mut self, timer: Interrupt) {
-    self.write(Reg::Control, 1 << (timer as usize));
+  fn clear(&self, timer: Interrupt) {
+    self.write_atomic(Reg::Control, 1 << (timer as usize));
   }
 
   // we only set timer3.
-  pub fn set(&mut self, usec: u32) {
-    let counter = self.read(Reg::CounterLow);
-    self.write(Reg::Timer3, counter.wrapping_add(usec));
+  pub fn set(&self, usec: u32) {
+    let counter = self.read_atomic(Reg::CounterLow);
+    self.write_atomic(Reg::Timer3, counter.wrapping_add(usec));
   }
 
-  pub fn get(&mut self) -> u64 {
+  pub fn get(&self) -> u64 {
     // FIXME account for rollover while reading.
-    return (self.read(Reg::CounterLow) as u64) | (self.read(Reg::CounterHigh) as u64) << 32;
+    return (self.read_atomic(Reg::CounterLow) as u64) | (self.read_atomic(Reg::CounterHigh) as u64) << 32;
   }
 
-  pub fn get_next(&mut self) -> u32 {
-    self.read(Reg::Control)
+  pub fn get_next(&self) -> u32 {
+    self.read_atomic(Reg::Control)
   }
 }
 
@@ -66,8 +65,9 @@ pub fn handle_interrupt(_n: usize) {
 }
 
 pub fn clear_interrupt(irq: usize) {
+  print!("clear!");
   match Interrupt::try_from(irq) {
-    Ok(i) => TIMER.lock().clear(i),
+    Ok(i) => TIMER.clear(i),
     Err(_) => ()
   };
 }

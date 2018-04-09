@@ -1,15 +1,14 @@
 use core::convert::TryFrom;
+use core::intrinsics;
 use mmio::Mmio;
 use native;
 use raspi;
-use spinlock::Mutex;
 
-pub static INTERRUPTS: Mutex<Interrupts> = Mutex::new(Interrupts::new());
+pub static INTERRUPTS: Interrupts = Interrupts::new();
 
 pub const IRQ_COUNT: usize = 72;
 
-pub type InterruptHandler = fn (interrupt: usize) -> ();
-pub type InterruptClearer = fn (interrupt: usize) -> ();
+pub type Callback = fn (irq: usize) -> ();
 
 pub enum Interrupt {
   Timer1 = 1,
@@ -47,8 +46,8 @@ impl TryFrom<usize> for Interrupt {
 }
 
 pub struct Interrupts {
-  handlers: [Option<InterruptHandler>; IRQ_COUNT],
-  clearers: [Option<InterruptClearer>; IRQ_COUNT],
+  handlers: [usize; IRQ_COUNT],
+  clearers: [usize; IRQ_COUNT],
 }
 
 impl Mmio<Reg> for Interrupts {
@@ -57,42 +56,61 @@ impl Mmio<Reg> for Interrupts {
 
 impl Interrupts {
   pub const fn new() -> Interrupts {
-    Interrupts { handlers: [None; IRQ_COUNT], clearers: [None; IRQ_COUNT] }
+    Interrupts {
+      handlers: [0; IRQ_COUNT],
+      clearers: [0; IRQ_COUNT],
+    }
   }
 
-  pub fn init(&mut self) {
+  pub fn init(&self) {
     // disable all interrupts
-    self.write(Reg::DisableGpu1, 0xffffffff);
-    self.write(Reg::DisableGpu2, 0xffffffff);
-    self.write(Reg::DisableBasic, 0xffffffff);
+    self.write_atomic(Reg::DisableGpu1, 0xffffffff);
+    self.write_atomic(Reg::DisableGpu2, 0xffffffff);
+    self.write_atomic(Reg::DisableBasic, 0xffffffff);
 
     native::enable_interrupts();
   }
 
-  pub fn register(&mut self, interrupt: usize, handler: InterruptHandler, clearer: InterruptClearer) {
-    if interrupt <= IRQ_COUNT {
-      if interrupt < 32 {
-        self.write(Reg::EnableGpu1, 1 << interrupt);
-      } else if interrupt < 64 {
-        self.write(Reg::EnableGpu2, 1 << (interrupt - 32));
-      } else {
-        self.write(Reg::EnableBasic, 1 << (interrupt - 64));
-      }
-      self.handlers[interrupt] = Some(handler);
-      self.clearers[interrupt] = Some(clearer);
+  fn get_callback(&self, vector: &[usize], irq: usize) -> Option<Callback> {
+    let ptr = unsafe { intrinsics::volatile_load(&vector[irq] as *const usize) as *const usize };
+    if ptr.is_null() {
+      None
+    } else {
+      Some(unsafe { *(&ptr as *const *const usize as *const Callback) })
     }
   }
 
-  pub fn next_pending_interrupt(&mut self) -> Option<u32> {
-    let pending_gpu1 = self.read(Reg::PendingGpu1);
+  fn set_callback(&self, vector: &[usize], irq: usize, callback: Callback) {
+    let ptr = callback as *const Callback;
+    // FIXME gross
+    unsafe { intrinsics::atomic_store(&vector[irq] as *const usize as usize as *mut usize, ptr as usize); }
+  }
+
+  pub fn register(&self, irq: usize, handler: Callback, clearer: Callback) {
+    if irq <= IRQ_COUNT {
+      if irq < 32 {
+        self.write_atomic(Reg::EnableGpu1, 1 << irq);
+      } else if irq < 64 {
+        self.write_atomic(Reg::EnableGpu2, 1 << (irq - 32));
+      } else {
+        self.write_atomic(Reg::EnableBasic, 1 << (irq - 64));
+      }
+
+      self.set_callback(&self.handlers, irq, handler);
+      self.set_callback(&self.clearers, irq, clearer);
+    }
+  }
+
+  pub fn next_pending_interrupt(&self) -> Option<u32> {
+    let pending_gpu1 = self.read_atomic(Reg::PendingGpu1);
     if pending_gpu1 != 0 {
       return Some(pending_gpu1.trailing_zeros());
     }
-    let pending_gpu2 = self.read(Reg::PendingGpu2);
+    let pending_gpu2 = self.read_atomic(Reg::PendingGpu2);
     if pending_gpu2 != 0 {
       return Some(pending_gpu2.trailing_zeros() + 32);
     }
-    let pending_basic = self.read(Reg::PendingBasic);
+    let pending_basic = self.read_atomic(Reg::PendingBasic);
     if (pending_basic & 255) != 0 {
       return Some((pending_basic & 255).trailing_zeros() + 64);
     }
@@ -102,13 +120,12 @@ impl Interrupts {
 
 #[no_mangle]
 pub extern fn vector_irq_handler() {
-  // FIXME: don't compete with kernel for interrupt lock. bad bad.
-  let mut i = INTERRUPTS.lock();
-  if let Some(interrupt) = i.next_pending_interrupt() {
-    if let Some(handler) = i.handlers[interrupt as usize] {
-      i.clearers[interrupt as usize].map(|f| f(interrupt as usize));
+  if let Some(irq) = INTERRUPTS.next_pending_interrupt() {
+    if let Some(handler) = INTERRUPTS.get_callback(&INTERRUPTS.handlers, irq as usize) {
+      let clearer = INTERRUPTS.get_callback(&INTERRUPTS.clearers, irq as usize);
+      clearer.map(|c| c(irq as usize));
       native::enable_interrupts();
-      handler(interrupt as usize);
+      handler(irq as usize);
       native::disable_interrupts();
     }
   }

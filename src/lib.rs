@@ -71,7 +71,7 @@ pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   unsafe {
     native::copy_memory(0 as *mut u8, exception_vector as *const u8, 16 * 8);
   }
-  interrupts::INTERRUPTS.lock().init();
+  interrupts::INTERRUPTS.init();
 
   print!("rv = {}\n", native::syscall(0, 23, 0, 0));
 
@@ -88,9 +88,9 @@ pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   print!("The meaning of life is {}\n", 42);
   print!("What if I print a line of text that's so long that it will wrap around an 80-column screen?\n");
 
-  timer::TIMER.lock().init();
-  timer::TIMER.lock().set(1000000);
-  print!("TIMER {}\n", timer::TIMER.lock().get());
+  timer::TIMER.init();
+  timer::TIMER.set(1000000);
+  print!("TIMER {}\n", timer::TIMER.get());
 
   loop {
     native::wait_for_event();
