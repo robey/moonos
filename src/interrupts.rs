@@ -1,3 +1,4 @@
+use core::convert::TryFrom;
 use mmio::Mmio;
 use native;
 use raspi;
@@ -33,6 +34,17 @@ impl Into<isize> for Reg {
   fn into(self) -> isize { self as isize }
 }
 
+impl TryFrom<usize> for Interrupt {
+  type Error = ();
+
+  fn try_from(n: usize) -> Result<Interrupt, ()> {
+    match n {
+      1 => Ok(Interrupt::Timer1),
+      3 => Ok(Interrupt::Timer3),
+      _ => Err(()),
+    }
+  }
+}
 
 pub struct Interrupts {
   handlers: [Option<InterruptHandler>; IRQ_COUNT],

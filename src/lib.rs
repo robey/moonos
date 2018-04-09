@@ -4,6 +4,7 @@
 #![feature(core_intrinsics)]
 #![feature(lang_items)]
 #![feature(slice_patterns)]
+#![feature(try_from)]
 #![no_std]
 
 // lots of constants and functions are defined for future use:
@@ -29,6 +30,7 @@ mod raspi;
 mod screen;
 mod spinlock;
 mod text_display;
+mod timer;
 mod uart;
 pub mod vectors;
 
@@ -71,9 +73,7 @@ pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   }
   interrupts::INTERRUPTS.lock().init();
 
-
-
-  print!("rv = {}\n", native::syscall(0, 23, 0, 0, 0));
+  print!("rv = {}\n", native::syscall(0, 23, 0, 0));
 
   let t1 = native::cycle_count();
   let mem = mailbox::get_memory_info().unwrap();
@@ -88,9 +88,17 @@ pub extern fn kernel_main(kernel_end: usize, exception_vector: usize) {
   print!("The meaning of life is {}\n", 42);
   print!("What if I print a line of text that's so long that it will wrap around an 80-column screen?\n");
 
+  timer::TIMER.lock().init();
+  timer::TIMER.lock().set(1000000);
+  print!("TIMER {}\n", timer::TIMER.lock().get());
+
   loop {
     native::wait_for_event();
-    let c = SERIAL0.lock().read_char();
-    print!("{} ", c as u32);
+  //  print!("TIMER {}\n", timer::TIMER.lock().get());
+  //  print!("next {}\n", timer::TIMER.lock().get_next());
+  //  print!("next {:?}\n", interrupts::INTERRUPTS.lock().next_pending_interrupt());
+
+     // let c = SERIAL0.lock().read_char();
+    // print!("{} ", c as u32);
   }
 }

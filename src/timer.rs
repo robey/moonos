@@ -1,3 +1,4 @@
+use core::convert::TryFrom;
 use interrupts::{Interrupt, INTERRUPTS};
 use mmio::Mmio;
 use raspi;
@@ -34,20 +35,20 @@ impl Timer {
 
   pub fn init(&mut self) {
     // only 1 and 3 are available, because the other 2 are used by the GPU.
+    self.clear(Interrupt::Timer1);
+    self.clear(Interrupt::Timer3);
     INTERRUPTS.lock().register(Interrupt::Timer1 as usize, handle_interrupt, clear_interrupt);
     INTERRUPTS.lock().register(Interrupt::Timer3 as usize, handle_interrupt, clear_interrupt);
   }
 
-  pub fn clear(&mut self) {
-    let x = self.read(Reg::Control) | (1 << 1);
-    self.write(Reg::Control, x);
+  pub fn clear(&mut self, timer: Interrupt) {
+    self.write(Reg::Control, 1 << (timer as usize));
   }
 
   // we only set timer3.
   pub fn set(&mut self, usec: u32) {
     let counter = self.read(Reg::CounterLow);
     self.write(Reg::Timer3, counter.wrapping_add(usec));
-    self.clear();
   }
 
   pub fn get(&mut self) -> u64 {
@@ -64,6 +65,9 @@ pub fn handle_interrupt(_n: usize) {
   print!("timer!\n");
 }
 
-pub fn clear_interrupt(_n: usize) {
-  TIMER.lock().clear();
+pub fn clear_interrupt(irq: usize) {
+  match Interrupt::try_from(irq) {
+    Ok(i) => TIMER.lock().clear(i),
+    Err(_) => ()
+  };
 }
