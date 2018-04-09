@@ -5,7 +5,13 @@
 .global _exception_vector
 .global _saved_registers
 
-.set SUPERVISOR, 0x13
+.set MODE_USER, 0x10
+.set MODE_FIQ, 0x11
+.set MODE_IRQ, 0x12
+.set MODE_SUPERVISOR, 0x13
+.set MODE_ABORT, 0x17
+.set MODE_UNDEFINED, 0x1b
+.set MODE_SYSTEM, 0x1f
 
 .macro save_all_registers
 //  stmfd sp!, {r0-r15}^
@@ -59,7 +65,7 @@ vector_undefined_setup:
 vector_syscall_setup:
   save_all_registers
   // for unknown reasons, armv7 disables interrupts in a svc call!
-  cpsie if, #SUPERVISOR
+  cpsie if, #MODE_SUPERVISOR
   push {r4, r5, r12, lr}
   ldr r4, vector_syscalls
   ldr r5, vector_syscalls_end
@@ -82,16 +88,16 @@ vector_irq_handler_setup:
   // save lr, spsr on supervisor stack, then switch back to supervisor mode
   // with interrupts disabled.
   sub lr, lr, #4
-  srsdb sp!, #SUPERVISOR
-  cpsid if, #SUPERVISOR
+  srsdb sp!, #MODE_SUPERVISOR
+  cpsid if, #MODE_SUPERVISOR
   // save trash registers, round SP to align(8).
-  push {r0-r3, r12, lr}
+  push {r0-r3, r12}
   and r1, sp, #4
   sub sp, sp, r1
-  push {r1}
+  push {r1, lr}
   bl vector_irq_handler
   // restore everything and return from exception.
-  pop {r1}
+  pop {r1, lr}
   add sp, sp, r1
-  pop {r0-r3, r12, lr}
+  pop {r0-r3, r12}
   rfeia sp!
