@@ -1,73 +1,43 @@
-use core::fmt;
 use core::slice;
-use core::str;
-
-struct Line {
-  buffer: [u8; 80],
-  pos: usize,
-}
-
-impl Line {
-  pub fn new() -> Line {
-    Line { buffer: [0; 80], pos: 0 }
-  }
-
-  pub fn str(&self) -> &str {
-    str::from_utf8(&self.buffer[0..self.pos]).unwrap()
-  }
-}
-
-impl fmt::Write for Line {
-  fn write_str(&mut self, s: &str) -> fmt::Result {
-    for b in s.bytes() {
-      if self.pos >= 80 { return Err(fmt::Error) };
-      self.buffer[self.pos] = b;
-      self.pos += 1;
-    }
-    Ok(())
-  }
-}
 
 
-fn generate_hex_line(address: usize, skip_front: usize, skip_back: usize, as_bytes: bool) -> Result<Line, fmt::Error> {
-  use core::fmt::Write;
-  let mut line = Line::new();
+fn print_hex_line(address: usize, skip_front: usize, skip_back: usize, as_bytes: bool) {
   let ptr = unsafe { slice::from_raw_parts(address as *const u8, 16) };
   let word_ptr = unsafe { slice::from_raw_parts(address as *const u32, 16) };
 
-  write!(&mut line, "{:08x}:  ", address)?;
+  print!("{:08x}:  ", address as u32);
 
   let mut i = 0;
   while i < 16 {
-    if i == 8 && as_bytes { write!(&mut line, " ")?; }
+    if i == 8 && as_bytes { print!(" "); }
     if i < skip_front || i >= 16 - skip_back {
       if as_bytes {
-        write!(&mut line, "   ")?;
+        print!("   ");
       } else {
-        write!(&mut line, "         ")?;
+        print!("         ");
       }
     } else {
       if as_bytes {
-        write!(&mut line, "{:02x} ", ptr[i])?;
+        print!("{:02x} ", ptr[i]);
       } else {
-        write!(&mut line, "{:08x} ", word_ptr[i >> 2])?;
+        print!("{:08x} ", word_ptr[i >> 2]);
       }
     }
     i += if as_bytes { 1 } else { 4 };
   }
 
-  write!(&mut line, "  ")?;
+  print!("  ");
 
   for i in 0..16 {
-    if i == 8 { write!(&mut line, " ")?; }
+    if i == 8 { print!(" "); }
     if i < skip_front || i >= 16 - skip_back {
-      write!(&mut line, " ")?;
+      print!(" ");
     } else {
-      write!(&mut line, "{}", if ptr[i] >= 0x20 && ptr[i] <= 0x7e { ptr[i] as char } else { '.' })?;
+      print!("{}", if ptr[i] >= 0x20 && ptr[i] <= 0x7e { ptr[i] as char } else { '.' });
     }
   }
 
-  Ok(line)
+  print!("\n");
 }
 
 pub fn dump_memory(address_start: usize, address_end: usize, as_bytes: bool) {
@@ -76,9 +46,7 @@ pub fn dump_memory(address_start: usize, address_end: usize, as_bytes: bool) {
   while address < address_last {
     let skip_front = if address < address_start { address_start - address } else { 0 };
     let skip_back = if address + 16 > address_end { address + 16 - address_end } else { 0 };
-    if let Ok(line) = generate_hex_line(address, skip_front, skip_back, as_bytes) {
-      print!("{}\n", line.str());
-    }
+    print_hex_line(address, skip_front, skip_back, as_bytes);
     address += 16;
   }
 }
