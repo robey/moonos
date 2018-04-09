@@ -51,8 +51,16 @@ impl Timer {
   }
 
   pub fn get(&self) -> u64 {
-    // FIXME account for rollover while reading.
-    return (self.read_atomic(Reg::CounterLow) as u64) | (self.read_atomic(Reg::CounterHigh) as u64) << 32;
+    // read the high word before & after the low, to make sure we don't get
+    // a split value during rollover. (think: 1_ffffffff to 2_00000000,
+    // returning 1_00000000)
+    loop {
+      let initial_high = self.read_atomic(Reg::CounterHigh) as u64;
+      let low = self.read_atomic(Reg::CounterLow) as u64;
+      if initial_high == self.read_atomic(Reg::CounterHigh) as u64 {
+        return (initial_high << 32) | low;
+      }
+    }
   }
 
   pub fn get_next(&self) -> u32 {
