@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
-use core::intrinsics;
 use mmio::Mmio;
 use native;
+use optional_callback::OptionalCallback;
 use raspi;
 
 pub static INTERRUPTS: Interrupts = Interrupts::new();
@@ -46,8 +46,8 @@ impl TryFrom<usize> for Interrupt {
 }
 
 pub struct Interrupts {
-  handlers: [usize; IRQ_COUNT],
-  clearers: [usize; IRQ_COUNT],
+  handlers: [OptionalCallback; IRQ_COUNT],
+  clearers: [OptionalCallback; IRQ_COUNT],
 }
 
 impl Mmio<Reg> for Interrupts {
@@ -57,8 +57,8 @@ impl Mmio<Reg> for Interrupts {
 impl Interrupts {
   pub const fn new() -> Interrupts {
     Interrupts {
-      handlers: [0; IRQ_COUNT],
-      clearers: [0; IRQ_COUNT],
+      handlers: [OptionalCallback::new(); IRQ_COUNT],
+      clearers: [OptionalCallback::new(); IRQ_COUNT],
     }
   }
 
@@ -71,21 +71,6 @@ impl Interrupts {
     native::enable_interrupts();
   }
 
-  fn get_callback(&self, vector: &[usize], irq: usize) -> Option<Callback> {
-    let ptr = unsafe { intrinsics::volatile_load(&vector[irq] as *const usize) as *const usize };
-    if ptr.is_null() {
-      None
-    } else {
-      Some(unsafe { *(&ptr as *const *const usize as *const Callback) })
-    }
-  }
-
-  fn set_callback(&self, vector: &[usize], irq: usize, callback: Callback) {
-    let ptr = callback as *const Callback;
-    // FIXME gross
-    unsafe { intrinsics::atomic_store(&vector[irq] as *const usize as usize as *mut usize, ptr as usize); }
-  }
-
   pub fn register(&self, irq: usize, handler: Callback, clearer: Callback) {
     if irq <= IRQ_COUNT {
       if irq < 32 {
@@ -96,23 +81,23 @@ impl Interrupts {
         self.write_atomic(Reg::EnableBasic, 1 << (irq - 64));
       }
 
-      self.set_callback(&self.handlers, irq, handler);
-      self.set_callback(&self.clearers, irq, clearer);
+      self.handlers[irq].set(Some(handler));
+      self.clearers[irq].set(Some(clearer));
     }
   }
 
-  pub fn next_pending_interrupt(&self) -> Option<u32> {
+  pub fn next_pending_interrupt(&self) -> Option<usize> {
     let pending_gpu1 = self.read_atomic(Reg::PendingGpu1);
     if pending_gpu1 != 0 {
-      return Some(pending_gpu1.trailing_zeros());
+      return Some(pending_gpu1.trailing_zeros() as usize);
     }
     let pending_gpu2 = self.read_atomic(Reg::PendingGpu2);
     if pending_gpu2 != 0 {
-      return Some(pending_gpu2.trailing_zeros() + 32);
+      return Some(pending_gpu2.trailing_zeros() as usize + 32);
     }
     let pending_basic = self.read_atomic(Reg::PendingBasic);
     if (pending_basic & 255) != 0 {
-      return Some((pending_basic & 255).trailing_zeros() + 64);
+      return Some((pending_basic & 255).trailing_zeros() as usize + 64);
     }
     None
   }
@@ -121,12 +106,13 @@ impl Interrupts {
 #[no_mangle]
 pub extern fn vector_irq_handler() {
   if let Some(irq) = INTERRUPTS.next_pending_interrupt() {
-    if let Some(handler) = INTERRUPTS.get_callback(&INTERRUPTS.handlers, irq as usize) {
-      let clearer = INTERRUPTS.get_callback(&INTERRUPTS.clearers, irq as usize);
-      clearer.map(|c| c(irq as usize));
-      native::enable_interrupts();
-      handler(irq as usize);
-      native::disable_interrupts();
+    if let Some(clearer) = INTERRUPTS.clearers[irq].get() {
+      clearer(irq);
+      if let Some(handler) = INTERRUPTS.handlers[irq].get() {
+        native::enable_interrupts();
+        handler(irq);
+        native::disable_interrupts();
+      }
     }
   }
 }

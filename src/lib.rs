@@ -26,6 +26,7 @@ mod limoncello;
 mod mailbox;
 mod mmio;
 mod native;
+mod optional_callback;
 mod raspi;
 mod screen;
 mod spinlock;
