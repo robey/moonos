@@ -5,6 +5,8 @@
 .global _exception_vector
 .global _saved_registers
 
+.set SUPERVISOR, 0x13
+
 .macro save_all_registers
 //  stmfd sp!, {r0-r15}^
   stmfd sp!, {r0-r15}
@@ -52,27 +54,36 @@ vector_undefined_setup:
 // arm convention is to get the SVC number by reading the source instruction
 // (which is in `[lr, #-4]`). however, this pollutes the data cache with
 // an instruction block for no reason, so modern OS use a register for this.
-// we choose r4, pikachu!
+// we choose r3, pikachu!
+// (r4, r5 are pre-saved for us by the syscall wrapper)
 vector_syscall_setup:
   save_all_registers
-  stmfd sp!, {r5, r6, lr}
-  add r3, sp, #12
-  ldr r6, =vector_syscalls
-  ldr r5, =vector_syscalls_end
-  ldr r6, [r6, r4, lsl #2]
-  cmp r5, r6
-  ldrge r6, =syscall_zero
-  blx r6
-  ldmia sp!, {r5, r6, lr}
+  // for unknown reasons, armv7 disables interrupts in a svc call!
+  cpsie if, #SUPERVISOR
+  push {r4, r5, r12, lr}
+  ldr r4, vector_syscalls
+  ldr r5, vector_syscalls_end
+  add r4, r4, r3, lsl #2
+  cmp r5, r4
+  ldrge r4, =syscall_zero
+  // put location of saved registers into r3:
+  add r3, sp, #16
+  blx r4
+  pop {r4, r5, r12, lr}
   unsave_all_registers
   bx lr
+
+vector_syscalls:
+  .word syscall_zero
+  .word syscall_one
+vector_syscalls_end:
 
 vector_irq_handler_setup:
   // save lr, spsr on supervisor stack, then switch back to supervisor mode
   // with interrupts disabled.
   sub lr, lr, #4
-  srsdb sp!, #0x13
-  cpsid if, #0x13
+  srsdb sp!, #SUPERVISOR
+  cpsid if, #SUPERVISOR
   // save trash registers, round SP to align(8).
   push {r0-r3, r12, lr}
   and r1, sp, #4
@@ -84,8 +95,3 @@ vector_irq_handler_setup:
   add sp, sp, r1
   pop {r0-r3, r12, lr}
   rfeia sp!
-
-vector_syscalls:
-  .word syscall_zero
-  .word syscall_one
-vector_syscalls_end:

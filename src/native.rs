@@ -107,15 +107,20 @@ pub fn disable_interrupts() {
   }
 }
 
+// FIXME: saving LR, SPSR is only necessary from service mode (and won't work from user mode)
 #[inline]
-pub fn syscall(syscall_number: usize, param1: usize, param2: usize, param3: usize, param4: usize) -> usize {
+pub fn syscall(syscall_number: usize, param1: usize, param2: usize, param3: usize) -> usize {
   let mut _rv: usize;
   unsafe {
     asm!(
-      "svc #0"
+      "
+      mrs r4, spsr
+      svc #0
+      msr spsr, r4
+      "
       : "={r0}"(_rv)
-      : "{r4}"(syscall_number), "{r0}"(param1), "{r1}"(param2), "{r2}"(param3), "{r3}"(param4)
-      : "r0", "r1", "r2", "r3", "r12", "cc"
+      : "{r3}"(syscall_number), "{r0}"(param1), "{r1}"(param2), "{r2}"(param3)
+      : "r0", "r1", "r2", "r3", "r4", "cc"
       : "volatile"
     );
   }
