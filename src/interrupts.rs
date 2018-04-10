@@ -1,6 +1,4 @@
 use core::convert::TryFrom;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use mmio::{Mmio, with_registers};
 use native;
 use optional_callback::OptionalCallback;
 use raspi;
@@ -17,16 +15,16 @@ pub enum Interrupt {
 }
 
 pub struct InterruptRegisters {
-  pending_basic: AtomicUsize,  // 64 - 71
-  pending_gpu_1: AtomicUsize,  // 0 - 31
-  pending_gpu_2: AtomicUsize,  // 32 - 63
-  control_fiq: AtomicUsize,
-  enable_gpu_1: AtomicUsize,
-  enable_gpu_2: AtomicUsize,
-  enable_basic: AtomicUsize,
-  disable_gpu_1: AtomicUsize,
-  disable_gpu_2: AtomicUsize,
-  disable_basic: AtomicUsize,
+  pending_basic: u32,  // 64 - 71
+  pending_gpu_1: u32,  // 0 - 31
+  pending_gpu_2: u32,  // 32 - 63
+  control_fiq: u32,
+  enable_gpu_1: u32,
+  enable_gpu_2: u32,
+  enable_basic: u32,
+  disable_gpu_1: u32,
+  disable_gpu_2: u32,
+  disable_basic: u32,
 }
 
 impl TryFrom<usize> for Interrupt {
@@ -56,23 +54,23 @@ impl Interrupts {
 
   pub fn init(&self) {
     // disable all interrupts
-    with_registers(raspi::INTERRUPTS_BASE, |r: &InterruptRegisters| {
-      r.disable_gpu_1.store(0xffffffff, Ordering::Relaxed);
-      r.disable_gpu_2.store(0xffffffff, Ordering::Relaxed);
-      r.disable_basic.store(0xffffffff, Ordering::Relaxed);
+    native::with_registers(raspi::INTERRUPTS_BASE, |r: &mut InterruptRegisters| {
+      r.disable_gpu_1 = 0xffffffff;
+      r.disable_gpu_2 = 0xffffffff;
+      r.disable_basic = 0xffffffff;
     });
     native::enable_interrupts();
   }
 
   pub fn register(&self, irq: usize, handler: Callback, clearer: Callback) {
     if irq <= IRQ_COUNT {
-      with_registers(raspi::INTERRUPTS_BASE, |r: &InterruptRegisters| {
+      native::with_registers(raspi::INTERRUPTS_BASE, |r: &mut InterruptRegisters| {
         if irq < 32 {
-          r.enable_gpu_1.store(1 << irq, Ordering::Relaxed);
+          r.enable_gpu_1 = 1 << irq;
         } else if irq < 64 {
-          r.enable_gpu_2.store(1 << (irq - 32), Ordering::Relaxed);
+          r.enable_gpu_2 = 1 << (irq - 32);
         } else {
-          r.enable_basic.store(1 << (irq - 64), Ordering::Relaxed);
+          r.enable_basic = 1 << (irq - 64);
         }
       });
 
@@ -82,16 +80,16 @@ impl Interrupts {
   }
 
   pub fn next_pending_interrupt(&self) -> Option<usize> {
-    with_registers(raspi::INTERRUPTS_BASE, |r: &InterruptRegisters| {
-      let pending_gpu_1 = r.pending_gpu_1.load(Ordering::Relaxed);
+    native::with_registers(raspi::INTERRUPTS_BASE, |r: &mut InterruptRegisters| {
+      let pending_gpu_1 = r.pending_gpu_1;
       if pending_gpu_1 != 0 {
         return Some(pending_gpu_1.trailing_zeros() as usize);
       }
-      let pending_gpu_2 = r.pending_gpu_2.load(Ordering::Relaxed);
+      let pending_gpu_2 = r.pending_gpu_2;
       if pending_gpu_2 != 0 {
         return Some(pending_gpu_2.trailing_zeros() as usize + 32);
       }
-      let pending_basic = r.pending_basic.load(Ordering::Relaxed);;
+      let pending_basic = r.pending_basic;
       if (pending_basic & 255) != 0 {
         return Some((pending_basic & 255).trailing_zeros() as usize + 64);
       }

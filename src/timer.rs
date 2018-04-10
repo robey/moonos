@@ -73,7 +73,7 @@ pub fn handle_interrupt(_n: usize) {
 }
 
 pub fn clear_interrupt(irq: usize) {
-  print!("clear!");
+  print!("clear!\n");
   match Interrupt::try_from(irq) {
     Ok(i) => TIMER.clear(i),
     Err(_) => ()

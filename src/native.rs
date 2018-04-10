@@ -1,3 +1,4 @@
+use core::mem;
 
 // asm(text : outputs : inputs : clobbers : options)
 
@@ -126,6 +127,19 @@ pub fn syscall(syscall_number: usize, param1: usize, param2: usize, param3: usiz
     );
   }
   _rv
+}
+
+/// map a register struct into MMIO space, for easy access. a closure is used
+/// so memory barriers can be applied on each side (technically required by
+/// the BCM docs). this is safe because the access size of each register is
+/// u32, so normal memory accesses are fine (with a barrier on each side).
+/// it's nicer than casting and using `intrinsic::volatile_load` because we
+/// can use names.
+pub fn with_registers<R, A, F>(base: usize, f: F) -> A where F: Fn(&mut R) -> A {
+  barrier();
+  let rv = f(unsafe { mem::transmute(base) });
+  barrier();
+  rv
 }
 
 pub unsafe fn copy_memory(mut dest: *mut u8, mut source: *const u8, mut count: usize) {
