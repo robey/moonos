@@ -1,4 +1,5 @@
 use core::intrinsics;
+use core::mem;
 
 pub type Callback = fn (irq: usize) -> ();
 
@@ -25,14 +26,14 @@ impl OptionalCallback {
   }
 
   pub fn set(&self, callback: Option<Callback>) {
-    let value = callback.map(|c| c as *const usize as usize).unwrap_or(0);
+    let value: usize = callback.map(|c| unsafe { mem::transmute(c) }).unwrap_or(0);
     // this is an atomic operation, so do some ju-jitsu to cast into mutability.
-    let ptr = &self.pointer as *const usize as usize as *mut usize;
+    let ptr: *mut usize = unsafe { mem::transmute(&self.pointer) };
     unsafe { intrinsics::atomic_store(ptr, value); }
   }
 
   pub fn get(&self) -> Option<Callback> {
-    let ptr = &self.pointer as *const usize;
+    let ptr: *const usize = unsafe { mem::transmute(&self.pointer) };
     let value_ptr = unsafe { intrinsics::volatile_load(ptr) as *const usize };
     if value_ptr.is_null() {
       None
@@ -40,7 +41,7 @@ impl OptionalCallback {
       // rust doesn't mind casting `Callback -> *const`, but it will be
       // damned if it will cast `*const -> Callback`! so add a layer of
       // indirection.
-      Some(unsafe { *(&value_ptr as *const *const usize as *const Callback) })
+      Some(unsafe { mem::transmute(value_ptr) })
     }
   }
 }
