@@ -24,10 +24,11 @@ enum ProcessorFlags {
   Negative = 1 << 31,
 }
 
-// "data synchronization barrier"
+// "data memory barrier"
+// there is a stronger version (dsb) for when code is changing too
 #[inline]
 pub fn barrier() {
-  unsafe { asm!("dsb" ::: "memory" : "volatile") };
+  unsafe { asm!("dmb" ::: "memory" : "volatile") };
 }
 
 // halt until interrupt or `sev` (wakeup for spinlocks)

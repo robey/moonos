@@ -38,9 +38,6 @@ impl OptionalCallback {
     if value_ptr.is_null() {
       None
     } else {
-      // rust doesn't mind casting `Callback -> *const`, but it will be
-      // damned if it will cast `*const -> Callback`! so add a layer of
-      // indirection.
       Some(unsafe { mem::transmute(value_ptr) })
     }
   }
